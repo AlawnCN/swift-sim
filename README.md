@@ -58,18 +58,18 @@ mvn -B -DskipTests package      # 生成 target/swift-sim-0.1.0.jar
 python3 tests/e2e.py            # 端到端测试（服务需已启动）
 ```
 
-* 只监听 `127.0.0.1:8080`（`application.yml` 中 `server.address`）；外部仅能通过下文的 Cloudflare Tunnel + Access（需 Service Token）访问。
+* 默认只监听 `127.0.0.1:8080`（`application.yml` 中 `server.address`）；如需局域网访问见下文「部署 / 监听地址」。
 * Web UI：<http://localhost:8080/>（报文日志、按交易参考号过滤、查看原文/NAK 原因、激活/触发场景、以任意参与行身份发报、加载样例）。
 * 配置目录 `./config`、数据目录 `./data`、样例目录 `./samples`（均可通过 `--sim.config-dir=` 等覆盖）。
 * 修改 YAML 后无需重启：`curl -X POST localhost:8080/api/admin/reload`。
 
 ## 2A. 管理端（端口 8081）与 AI 接入 API（端口 8082）
 
-启动后同一个进程监听三个端口，**都只绑定 127.0.0.1**（隧道只转发 8080，8081/8082 不对外）：
+启动后同一个进程监听三个端口，**默认都只绑定 127.0.0.1**（如需对外监听见下文「部署 / 监听地址」）：
 
 | 端口 | 用途 | 鉴权 |
 |---|---|---|
-| 8080 | 报文网关 / 原有 REST API `/api/**` / 原 Web UI（不变；`/admin/**`、`/ai/**` 在此端口返回 404） | 无（仅本机 + Cloudflare Access） |
+| 8080 | 报文网关 / 原有 REST API `/api/**` / 原 Web UI（不变；`/admin/**`、`/ai/**` 在此端口返回 404） | 无（默认仅本机） |
 | 8081 | **中文管理端** <http://127.0.0.1:8081/>（也可在此端口调用 `/api/**`） | 登录（cookie），账号密码文件见下 |
 | 8082 | **AI API** `http://127.0.0.1:8082/ai/v1`，OpenAPI `/ai/v1/openapi.json`，MCP `/ai/v1/mcp` | `Authorization: Bearer <key>` |
 
@@ -108,61 +108,25 @@ python3 tests/e2e.py            # 端到端测试（服务需已启动）
 `mcp-config.md`（Cursor / Claude Desktop / Claude Code 配置示例）、`curl-examples.md`、`openapi.json`（由 `tests/gen_openapi.py` 生成，与 `/ai/v1/openapi.json` 相同）。
 从其他机器接入：`ssh -N -L 8081:127.0.0.1:8081 -L 8082:127.0.0.1:8082 <user>@<主机>`，然后用同样的本地地址。
 
-### 外部访问（已部署：Cloudflare Tunnel + Cloudflare Access Service Token）
+### 部署 / 监听地址
 
-模拟器本身仍**只监听 `127.0.0.1:8080`**；外部流量经 Cloudflare Tunnel（出站连接，box 不开放任何入站端口）转发进来，并由 Cloudflare Access 在边缘做鉴权。
+三个端口（8080 网关、8081 管理端、8082 AI API）**默认都只绑定 `127.0.0.1`**，只能本机访问。
 
-| 项目 | 值 |
-|---|---|
-| 外部地址 | `https://swift-sim.mrtech.top`（例如 `https://swift-sim.mrtech.top/api/messages`） |
-| Tunnel | `swift-sim`，id `766ca214-6e1b-4b54-82ea-0b042a1e07a8`，远程管理（config_src=cloudflare），ingress：`swift-sim.mrtech.top -> http://127.0.0.1:8080`，其余 `http_status:404` |
-| DNS | `swift-sim.mrtech.top` CNAME `766ca214-6e1b-4b54-82ea-0b042a1e07a8.cfargotunnel.com`（已代理） |
-| Access 应用 | `swift-sim`（self-hosted），id `7e4838c1-efda-46fc-b053-31ece4036c44`，策略 `Service Auth`（non_identity），仅放行下面的 Service Token |
-| Service Token | `swift-sim-dev-server`，id `bb310335-3bd2-445d-9e03-82ad22e02227`，有效期至 2027-10-29 15:10 UTC |
-| Zero Trust 团队域 | `alawncn.cloudflareaccess.com` |
-
-**鉴权方式**：每个请求都必须带两个请求头：
-
-```
-CF-Access-Client-Id: <见凭据文件>
-CF-Access-Client-Secret: <见凭据文件>
-```
-
-ID / Secret 和可直接复制的 curl 示例保存在 `config/secrets/access-service-token.txt`（chmod 600，已加入 `.gitignore`，**不要提交或外传**）。
-不带头 → 403（Access 拦截）；Secret 错误 → 401；正确 → 由模拟器返回。
-
-示例（变量从凭据文件中取值）：
+如需在局域网内访问（监听所有网卡），任选其一：
 
 ```bash
-H1="CF-Access-Client-Id: $CF_ID"; H2="CF-Access-Client-Secret: $CF_SECRET"
-curl -sS -X POST https://swift-sim.mrtech.top/api/messages -H "$H1" -H "$H2" -H 'Content-Type: text/plain' --data-binary @samples/xxx.txt
-curl -sS "https://swift-sim.mrtech.top/api/messages?to=TSTAKEN0XXX" -H "$H1" -H "$H2"
+# 方式一：启动参数覆盖（run.sh 会把参数原样传给 jar）
+./run.sh --server.address=0.0.0.0 --sim.admin.address=0.0.0.0 --sim.ai.address=0.0.0.0
 ```
 
-**启动 / 停止 Tunnel**
+* 方式二：修改 `src/main/resources/application.yml` 中的三处 `address:`（`server.address`、`sim.admin.address`、`sim.ai.address`），然后重新打包。
 
-```bash
-./tunnel-start.sh   # 后台启动 cloudflared，日志 data/cloudflared.log，PID data/cloudflared.pid
-./tunnel-stop.sh    # 停止
-./run.sh            # 启动模拟器时也会自动启动 Tunnel（若未运行）；SWIFT_SIM_TUNNEL=0 ./run.sh 可跳过
-```
+访问地址（`<host>` 为部署机器的 IP 或主机名）：网关 `http://<host>:8080`、管理端 `http://<host>:8081`、AI API `http://<host>:8082/ai/v1`。
 
-* `stop.sh` 只停模拟器，不停 Tunnel（模拟器停掉时外部会得到 502）；要完全断开外部访问请执行 `./tunnel-stop.sh`。
-* cloudflared 二进制：`/opt/tools/cloudflared`；连接器 token 存放于 `config/secrets/tunnel.token`（chmod 600），通过 `--token-file` 读取，不出现在命令行/日志中。
-* box 的出站网络会把 `*.argotunnel.com` 解析到假 IP 且 QUIC 不通，因此脚本使用 `--protocol http2` 并用 `--edge` 固定 Cloudflare 边缘 IP（198.41.192.x / 198.41.200.x:7844）。在其他网络环境可用 `TUNNEL_EDGE_ARGS="" TUNNEL_PROTOCOL=auto ./tunnel-start.sh` 恢复默认。
-* 本地指标：`http://127.0.0.1:20241/metrics`。
-
-**轮换 / 吊销 Service Token**
-
-1. Cloudflare 控制台 → Zero Trust → Access → Service auth（服务凭据）→ `swift-sim-dev-server`：
-   * **Refresh**：延长有效期（ID/Secret 不变）；
-   * **Rotate**：生成新 Secret（旧 Secret 在过渡期内仍可用），把新 Secret 写回 `config/secrets/access-service-token.txt` 并下发给开发服务器；
-   * **Delete**：立即吊销，所有使用该 Token 的请求将被拒绝。
-2. 或通过 API：`POST /accounts/{account_id}/access/service_tokens/{id}/refresh`、`.../rotate`、`DELETE .../service_tokens/{id}`。
-3. 新增其他客户端：再建一个 Service Token，并把它加到 Access 应用 `swift-sim` 的 Service Auth 策略 include 中。
-4. 彻底下线外部访问：`./tunnel-stop.sh`，再在控制台删除 DNS 记录 `swift-sim.mrtech.top`、Tunnel `swift-sim` 与 Access 应用 `swift-sim`。
-
-> Secret 只在创建/轮换时返回一次，务必及时保存。到期时间 2027-10-29，到期前请 Refresh。
+**安全提示**：
+* **8080 网关本身没有任何鉴权**（并且提供 `DELETE /api/messages`、`DELETE /api/undertakings` 等删除接口），**不要暴露到公网**，仅在可信内网中开放。
+* 8081 管理端需要登录，账号密码在 `config/secrets/admin-console.properties`（首次启动自动生成）。
+* 8082 AI API 需要 `Authorization: Bearer <key>`，key 在 `config/secrets/ai-api-keys`。
 
 ## 3. 虚拟参与行（`config/participants.yml`，全部虚构）
 

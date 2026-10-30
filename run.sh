@@ -5,8 +5,6 @@ cd "$(dirname "$0")"
 JAVA=${JAVA_HOME:-/opt/tools/jdk}/bin/java
 [ -x "$JAVA" ] || JAVA=java
 mkdir -p data
-# Also start the Cloudflare Tunnel (external HTTPS access to 8080 only) unless SWIFT_SIM_TUNNEL=0
-if [ "${SWIFT_SIM_TUNNEL:-1}" != "0" ] && [ -x ./tunnel-start.sh ] && [ -r config/secrets/tunnel.token ]; then ./tunnel-start.sh; fi
 if [ -f data/app.pid ] && kill -0 "$(cat data/app.pid)" 2>/dev/null; then echo "already running pid $(cat data/app.pid)"; exit 0; fi
 nohup "$JAVA" -Xms128m -Xmx512m -jar target/swift-sim-0.1.0.jar "$@" >> data/app.log 2>&1 &
 echo $! > data/app.pid

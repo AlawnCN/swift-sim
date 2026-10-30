@@ -13,7 +13,7 @@ description: Connect to the SWIFT trade-finance simulator (swift-sim) AI API to 
 ## Connection
 | item | value |
 |---|---|
-| Base URL | `http://127.0.0.1:8082/ai/v1` (localhost only; from another machine use an SSH tunnel: `ssh -L 8082:127.0.0.1:8082 host`) |
+| Base URL | `http://127.0.0.1:8082/ai/v1` (bound to localhost by default; from another machine use SSH port forwarding `ssh -L 8082:127.0.0.1:8082 <host>` or start with `--sim.ai.address=0.0.0.0` and use `http://<host>:8082/ai/v1`) |
 | Auth | header `Authorization: Bearer <key>` (alternative: `X-Api-Key: <key>`) |
 | Keys | file `config/secrets/ai-api-keys` on the simulator host, one per line: `<name> <read|operator> <key>`; edits take effect without restart |
 | OpenAPI | `GET /ai/v1/openapi.json` (no auth) |

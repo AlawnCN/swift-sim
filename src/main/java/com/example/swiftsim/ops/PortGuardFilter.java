@@ -17,7 +17,7 @@ import java.util.Set;
 /**
  * Routing + authentication per listening port:
  * <ul>
- *   <li>gateway port (8080): unchanged; /admin/** and /ai/** are not reachable (404) - the Cloudflare tunnel only sees this port.</li>
+ *   <li>gateway port (8080): unchanged; /admin/** and /ai/** are not reachable (404) (no authentication on this port).</li>
  *   <li>admin port (8081): Chinese admin console /admin/** plus the existing /api/** - login required (cookie SIMADMIN);
  *       state-changing requests must carry header X-Sim-Admin: 1 (CSRF guard) and are written to the audit log.</li>
  *   <li>AI port (8082): only /ai/v1/** - Authorization: Bearer &lt;key&gt; from ai-api-keys; read scope may only GET (+ POST validate / mcp).</li>

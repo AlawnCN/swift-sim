@@ -388,8 +388,8 @@ if "--no-restart" not in sys.argv:
     record("F1 pending response persisted", any(p.get("txRef") == R2 or R2 in json.dumps(p) for p in pend), len(pend))
     _, before = req("GET", "/api/gateway/sessions")
     post(sample("mt760-issue-to-advising.fin", {"KEGTEE2026000001": R3}))   # stop immediately: delivery still due
-    subprocess.run(STOP_CMD, shell=True, cwd=ROOT, check=False, capture_output=True, env={**os.environ, "SWIFT_SIM_TUNNEL": "0"})
-    subprocess.run(START_CMD, shell=True, cwd=ROOT, check=False, capture_output=True, env={**os.environ, "SWIFT_SIM_TUNNEL": "0"})
+    subprocess.run(STOP_CMD, shell=True, cwd=ROOT, check=False, capture_output=True)
+    subprocess.run(START_CMD, shell=True, cwd=ROOT, check=False, capture_output=True)
     t0 = time.time()
     while not is_up() and time.time() - t0 < 60: time.sleep(1)
     record("F2 simulator restarted", is_up(), f"{time.time() - t0:.1f}s")

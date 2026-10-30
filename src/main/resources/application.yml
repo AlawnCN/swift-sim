@@ -1,6 +1,6 @@
 server:
   port: 8080
-  address: 127.0.0.1   # localhost only – do NOT expose publicly
+  address: 127.0.0.1   # localhost by default; gateway has no auth – do NOT expose to the public internet
 spring:
   application:
     name: swift-sim
@@ -24,7 +24,7 @@ sim:
   data-dir: ./data
   samples-dir: ./samples
   inbox-poll-ms: 2000
-# ---- admin console (Chinese web UI) and AI API: separate ports, localhost only (not exposed via the tunnel)
+# ---- admin console (Chinese web UI) and AI API: separate ports, bound to localhost by default
   admin:
     enabled: true
     port: 8081

@@ -1,0 +1,16 @@
+# MT767 amendment initiated by the (virtual) issuer -> SUT as advising bank: increase (32B) + new expiry (31E).
+# The beneficiary's consent is required: SUT answers MT787 (ACPT / REJT) - or acknowledges with MT768 first.
+:15A:
+:27:1/1
+:21:NONREF
+:22A:ISUA
+:15B:
+:20:${ref}
+:26E:${nextAmendmentNo|amendmentNo|'1'}
+:30:${today6}
+:52A:${issuerBic}
+:32B:${currency}${increase|'5000,00'}
+:23B:FIXD
+:31E:${newExpiry6}
+:77U:AMENDMENT: AMOUNT INCREASED AND EXPIRY EXTENDED.
+SIMULATED TEST MESSAGE - NO VALUE.

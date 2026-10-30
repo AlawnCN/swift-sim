@@ -1,0 +1,9 @@
+# MT759 issuer chaser - the beneficiary's response to our amendment is still outstanding (fireWhen ldg_status AMENDMENT_PENDING)
+:27:1/1
+:20:${newRef}
+:21:${ref}
+:22D:${ldg_form|'DGAR'}
+:23:${ref}
+:23H:OTHERFNC
+:45D:CHASER - PLEASE ADVISE THE BENEFICIARY'S ACCEPTANCE OR
+REJECTION OF AMENDMENT ${ldg_pendingAmendmentNo|''} TO UNDERTAKING ${ref}

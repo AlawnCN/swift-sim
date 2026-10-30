@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTAKEN0XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>KEMX0009</BizMsgIdr>
+  <MsgDefIdr>tsrv.008.001.01</MsgDefIdr>
+  <CreDt>2026-10-29T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.008.001.01">
+  <UdrtkgAmdmntRspn>
+    <UdrtkgAmdmntRspnDtls>
+      <AmdmntId><Id>GBGTEE2026000777</Id><SeqNb>2</SeqNb><Issr><Id><OrgId><AnyBIC>TSTBGB20XXX</AnyBIC></OrgId></Id></Issr></AmdmntId>
+      <AmdmntSts>ACCP</AmdmntSts>
+    </UdrtkgAmdmntRspnDtls>
+  </UdrtkgAmdmntRspn>
+</Document>
+</RequestPayload>

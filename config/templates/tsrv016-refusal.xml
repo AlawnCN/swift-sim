@@ -1,0 +1,21 @@
+<!-- tsrv.016 DemandRefusalNotification -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.016.001.01">
+  <DmndRfslNtfctn>
+    <DmndRfslNtfctnDtls>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+      <DmndDtls>
+        <Id>${demandId}</Id>
+        <SubmissnDtTm>${nowIso}</SubmissnDtTm>
+        <Amt Ccy="${currency}">${amountIso}</Amt>
+      </DmndDtls>
+      <Sts>REFUSED</Sts>
+      <Dscrpncy>
+        <Id>D1</Id>
+        <Nrrtv>${reason}</Nrrtv>
+      </Dscrpncy>
+    </DmndRfslNtfctnDtls>
+  </DmndRfslNtfctn>
+</Document>

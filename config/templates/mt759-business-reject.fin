@@ -1,0 +1,12 @@
+# MT759 used by a virtual bank to reject a message at BUSINESS level (simulator convention).
+# TODO verify against SWIFT UHB SR2021+ how a bank should reject a guarantee message (23H code / MT type); OTHERFNC is a placeholder.
+# ${rejectReasons} = BIZ-xxx reasons wrapped to 65 z-characters per line
+:27:1/1
+:20:${newRef}
+:21:${f20|ref|'NONREF'}
+:22D:${ldg_form|f22D|formOfUndertaking|'UNDK'}
+:23:${ref|'NONREF'}
+:23H:OTHERFNC
+:45D:BUSINESS REJECTION OF YOUR ${inboundType|'MESSAGE'}
+REFERENCE ${f20|ref|'NONREF'} - NOT PROCESSED
+${!rejectReasons}

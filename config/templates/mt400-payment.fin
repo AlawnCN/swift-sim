@@ -1,0 +1,6 @@
+# MT400 Advice of payment (collecting bank -> remitting bank): 32a amount collected, 33A proceeds remitted
+:20:${newRef}
+:21:${ref}
+:32B:${currency}${payAmount|outstanding|amount}
+:33A:${today6}${currency}${payAmount|outstanding|amount}
+:72:/PAID/PROCEEDS REMITTED VIA MT202

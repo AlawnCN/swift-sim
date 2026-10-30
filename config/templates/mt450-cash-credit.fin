@@ -1,0 +1,5 @@
+# MT450 Cash letter credit advice (collecting bank -> remitting bank)
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:32A:${today6}${currency}${payAmount|outstanding|amount}

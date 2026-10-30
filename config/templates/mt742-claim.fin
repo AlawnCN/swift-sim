@@ -1,0 +1,7 @@
+# MT742 Reimbursement claim (claiming / nominated bank -> reimbursing bank). 21 = credit number, 20 = claim reference
+:20:${newRef}
+:21:${ref}
+:31C:${lc_issueDate6|today6}
+:52A:${ldg_issuerBic|issuerBic}
+:32B:${currency}${drawAmount|kickoffAmount|amount}
+:34A:${today6}${currency}${drawAmount|kickoffAmount|amount}

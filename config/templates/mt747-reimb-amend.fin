@@ -1,0 +1,6 @@
+# MT747 Amendment to an authorisation to reimburse (virtual issuing bank -> SUT as reimbursing bank): increase 32B, new amount 34B (N31), new expiry 31E
+:20:${ref}
+:30:${today6}
+:31E:${lc_newExpiry6|newExpiry6}
+:32B:${currency}${lc_increase|'1000,00'}
+:34B:${currency}${lc_reimbNewAmount|amount}

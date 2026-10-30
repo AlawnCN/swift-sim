@@ -1,0 +1,8 @@
+# MT744 Notice of non-conforming reimbursement claim (reimbursing bank -> claimant). 21 = credit number, 21A = claim reference
+:20:${newRef}
+:21:${ref}
+:52A:${ldg_issuerBic|issuerBic}
+:21A:${f20|lc_presRef}
+:34A:${today6}${currency}${lc_presAmount|amount}
+:73R:${reason|'OTHR/CLAIM NOT IN LINE WITH MT740'}
+:73S:${disposal|'OTHR/SEND A CORRECTED CLAIM'}

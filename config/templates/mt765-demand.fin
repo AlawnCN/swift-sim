@@ -1,0 +1,9 @@
+# MT765 demand (kickoff from BENEFICIARY_BANK to SUT acting as issuer)
+# ${demandType} = PAYM (pay) or PAEX (extend or pay; then ${extra} adds :31E:)
+:20:${ref}
+:21:${demandId}
+:52A:${issuerBic}
+:59A:${fromBic}
+:22G:${demandType}
+:32B:${currency}${amount}
+${!extra|''}

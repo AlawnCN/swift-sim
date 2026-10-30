@@ -1,0 +1,5 @@
+# MT499 Free format (collection related)
+:20:${newRef}
+:21:${ref}
+:79:${narrative|'NOTED'}
+REFERENCE ${ref}

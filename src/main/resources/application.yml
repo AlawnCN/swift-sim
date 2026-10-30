@@ -1,0 +1,40 @@
+server:
+  port: 8080
+  address: 127.0.0.1   # localhost only – do NOT expose publicly
+spring:
+  application:
+    name: swift-sim
+  datasource:
+    url: jdbc:h2:file:${sim.data-dir}/db/swiftsim;AUTO_SERVER=FALSE
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 4
+sim:
+  config-dir: ./config
+  data-dir: ./data
+  samples-dir: ./samples
+  inbox-poll-ms: 2000
+# ---- admin console (Chinese web UI) and AI API: separate ports, localhost only (not exposed via the tunnel)
+  admin:
+    enabled: true
+    port: 8081
+    address: 127.0.0.1
+  ai:
+    enabled: true
+    port: 8082
+    address: 127.0.0.1
+  secrets-dir: ./config/secrets   # admin-console.properties + ai-api-keys are generated here on first start (chmod 600)
+  protected-refs: KEGTEE2026000101  # never selected by the admin purge tool unless explicitly included
+logging:
+  level:
+    com.prowidesoftware: WARN

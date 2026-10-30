@@ -1,0 +1,15 @@
+<!-- tsrv.019 UndertakingStatusReport. TODO: StsCtgy is an ISO external code (max 4 chars); values used here (ISSU/DMND/TERM/...) are placeholders - verify against ISO 20022 External Code Sets -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.019.001.01">
+  <UdrtkgStsRpt>
+    <UdrtkgStsRptDtls>
+      <InitgPty><Nm>${fromName}</Nm><Id><OrgId><AnyBIC>${fromBic}</AnyBIC></OrgId></Id></InitgPty>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+      <StsCtgy>${statusCategory|'GENR'}</StsCtgy>
+      <Sts>${status|'ACCP'}</Sts>
+      <AddtlInf>${info|'SIMULATED STATUS REPORT'} (in reply to ${inboundType|'message'})</AddtlInf>
+    </UdrtkgStsRptDtls>
+  </UdrtkgStsRpt>
+</Document>

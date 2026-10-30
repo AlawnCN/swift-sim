@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTAKEN0XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTECN20XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>KEMX0004</BizMsgIdr>
+  <MsgDefIdr>tsrv.014.001.01</MsgDefIdr>
+  <CreDt>2026-10-29T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.014.001.01">
+  <XtndOrPayReq>
+    <XtndOrPayReqDtls>
+      <UdrtkgId><Id>KEGTEE2026MX0001</Id><Issr><Nm>Your System Kenya Test Bank</Nm><Id><OrgId><AnyBIC>TSTAKEN0XXX</AnyBIC></OrgId></Id></Issr></UdrtkgId>
+      <DmndDtls><Id>BENDMD0002</Id><SubmissnDtTm>2026-10-29T09:00:00</SubmissnDtTm><Amt Ccy="USD">50000.00</Amt></DmndDtls>
+      <ReqdXpryDt>2027-12-31</ReqdXpryDt>
+      <BkInstrs><Txt>PLEASE INSTRUCT WHETHER TO EXTEND OR PAY</Txt><LastDtForRspn>2026-11-05</LastDtForRspn></BkInstrs>
+    </XtndOrPayReqDtls>
+  </XtndOrPayReq>
+</Document>
+</RequestPayload>

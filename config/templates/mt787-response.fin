@@ -1,0 +1,7 @@
+# MT787 Amendment response. ${status} = ACPT, or "REJT\n<reason line>" (23R = 4!c[6*35x])
+# TODO verify 23R code words against SWIFT UHB SR2021+ (simulator uses ACPT / REJT)
+:20:${ref}
+:21:${newRef}
+:52A:${issuerBic}
+:26E:${amendmentNo|'1'}
+:23R:${status}

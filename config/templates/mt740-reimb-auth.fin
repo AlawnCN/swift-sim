@@ -1,0 +1,11 @@
+# MT740 Authorisation to reimburse (virtual issuing bank -> SUT as reimbursing bank)
+:20:${ref}
+:40F:URR LATEST VERSION
+:31D:${expiry6}NAIROBI
+:59:KENYA EXPORTS LTD (FICTIONAL)
+NAIROBI KENYA
+:32B:${currency}${amount}
+:39A:05/05
+:41D:ANY BANK
+BY NEGOTIATION
+:71A:CLM

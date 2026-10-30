@@ -1,0 +1,76 @@
+{
+ "note": "status = derived effective status (milestone + pending items). Simulator ledgers are per receiving application; transitions listed are the ones the simulator applies. 'expectedNext' = what a correct counterparty usually sends next.",
+ "note_zh": "status 为派生的有效状态（里程碑 + 待处理事项）。expectedNext 表示对手方通常应发送的下一条报文。",
+ "products": {
+  "UNDERTAKING": {
+   "name": "Demand guarantee / standby LC (MT760 family, tsrv.*)", "name_zh": "保函 / 备用信用证",
+   "messages": ["MT760","MT761","MT765","MT767","MT768","MT769","MT775","MT785","MT786","MT787","MT759","tsrv.001-tsrv.019"],
+   "terminal": ["RELEASED","EXPIRED","TERMINATED"],
+   "statuses": {
+    "APPLIED": {"zh":"已申请（开立申请，MT798/tsrv.001 未开立）","expectedNext":["MT760 issuance"]},
+    "ISSUED": {"zh":"已开立（等待通知行确认）","expectedNext":["MT768 acknowledgement from advising bank","MT767 amendment","MT765 demand"]},
+    "ADVISED": {"zh":"已通知受益人","expectedNext":["MT767 amendment","MT765 demand","MT769 reduction/release","expiry"]},
+    "AMENDED": {"zh":"已修改生效","expectedNext":["MT765 demand","MT767 further amendment","MT769"]},
+    "AMENDMENT_PENDING": {"zh":"修改待受益人接受/拒绝","expectedNext":["MT787 amendment response (ACCP/RJCT) or MT768 ack"]},
+    "DEMAND_RECEIVED": {"zh":"收到索赔，待付款/拒付","expectedNext":["MT786 refusal","MT202/MT103 payment + MT769 reduction","MT785 non-extension"]},
+    "EXTEND_OR_PAY_PENDING": {"zh":"展期或付款请求待处理","expectedNext":["MT767 extension","payment (MT769)","MT786 refusal"]},
+    "PAID": {"zh":"已付款（全部或部分）","expectedNext":["MT769 reduction/release"]},
+    "REDUCED": {"zh":"已减额","expectedNext":["further demand","MT769 release"]},
+    "EXTENDED": {"zh":"已展期","expectedNext":["MT765 demand","expiry"]},
+    "REFUSED": {"zh":"索赔被拒","expectedNext":["new demand","expiry"]},
+    "RELEASED": {"zh":"已解除（余额为 0）","expectedNext":[]},
+    "EXPIRED": {"zh":"已到期","expectedNext":[]},
+    "TERMINATED": {"zh":"已终止","expectedNext":[]}
+   },
+   "transitions": [
+    ["-","MT760 / tsrv.001","ISSUED"],["ISSUED","MT768 ACK by non-issuer","ADVISED"],["*","MT767 amendment","AMENDMENT_PENDING"],
+    ["AMENDMENT_PENDING","MT787 ACCP","AMENDED"],["AMENDMENT_PENDING","MT787 RJCT","previous"],["*","MT765 demand","DEMAND_RECEIVED / EXTEND_OR_PAY_PENDING"],
+    ["DEMAND_RECEIVED","payment","PAID / REDUCED / RELEASED"],["DEMAND_RECEIVED","MT786 refusal","REFUSED"],["EXTEND_OR_PAY_PENDING","MT767 new expiry","EXTENDED"],
+    ["*","MT769 reduction to 0 / release","RELEASED"],["*","expiry date passed (sweep, business date)","EXPIRED"]
+   ]
+  },
+  "LC": {
+   "name": "Documentary credit (MT700 family, MT740/742/747/756 reimbursement)", "name_zh": "跟单信用证",
+   "messages": ["MT700","MT701","MT705","MT707","MT708","MT710","MT711","MT720","MT721","MT730","MT732","MT734","MT740","MT742","MT744","MT747","MT750","MT752","MT754","MT756"],
+   "terminal": ["CANCELLED","EXPIRED"],
+   "itemStatuses": {"PRESENTED":"交单待审核","DISCREPANT":"不符点待处理","ACCEPTED":"已承兑","AUTHORISED":"已授权付款","PAID":"已付款","REFUSED":"拒付","DISCHARGED":"已解除","CLAIMED":"偿付已索偿","REIMBURSED":"已偿付","REJECTED":"拒绝"},
+   "statuses": {
+    "PRE_ADVISED": {"zh":"预通知（MT705）","expectedNext":["MT700 issuance"]},
+    "ISSUED": {"zh":"已开立","expectedNext":["MT730 acknowledgement","MT707 amendment","MT710/720 advice of third bank / transfer"]},
+    "ADVISED": {"zh":"已通知","expectedNext":["MT707 amendment","MT750/MT754 presentation"]},
+    "CONFIRMED": {"zh":"已保兑","expectedNext":["MT707","MT754 presentation"]},
+    "TRANSFERRED": {"zh":"已转让","expectedNext":["presentation"]},
+    "AMENDED": {"zh":"已修改","expectedNext":["presentation","MT707"]},
+    "AMENDMENT_PENDING": {"zh":"修改待受益人接受","expectedNext":["MT730 with acceptance/refusal"]},
+    "DOCS_PRESENTED": {"zh":"已交单待审单（5 个银行工作日内）","expectedNext":["MT752 authorisation","MT734 refusal","MT756 reimbursement/payment"]},
+    "DISCREPANT": {"zh":"有不符点","expectedNext":["MT752 (waiver accepted)","MT734 refusal","MT750 advice of discrepancy response"]},
+    "ACCEPTED": {"zh":"已承兑（远期）","expectedNext":["payment at maturity (MT756/MT202)"]},
+    "PAID": {"zh":"已付款","expectedNext":["further drawings while available > 0","expiry"]},
+    "REFUSED": {"zh":"已拒付","expectedNext":["re-presentation","return documents"]},
+    "REIMBURSED": {"zh":"已偿付","expectedNext":[]},
+    "DISCHARGED": {"zh":"已解除","expectedNext":[]},
+    "CANCELLED": {"zh":"已撤销","expectedNext":[]},
+    "EXPIRED": {"zh":"已到期","expectedNext":[]}
+   },
+   "invariants": ["utilised <= maxAmount (amount * (1+tolerancePlus%))","available = maxAmount - utilised >= 0","reimbClaimed <= reimbAmount","refusal within 5 banking days of presentation"]
+  },
+  "COLL": {
+   "name": "Documentary collection (MT400 family)", "name_zh": "跟单托收",
+   "messages": ["MT400","MT410","MT412","MT416","MT420","MT422","MT430","MT450","MT455","MT456"],
+   "terminal": ["PAID","RETURNED"],
+   "statuses": {
+    "SENT": {"zh":"托收已寄送","expectedNext":["MT410 acknowledgement"]},
+    "ACKNOWLEDGED": {"zh":"代收行已确认","expectedNext":["MT412 acceptance (D/A)","MT416 non-payment/non-acceptance","MT400 payment advice"]},
+    "ACCEPTED": {"zh":"已承兑","expectedNext":["MT400 payment at maturity"]},
+    "AMENDED": {"zh":"托收指示已修改","expectedNext":["MT410"]},
+    "NON_ACCEPTED": {"zh":"拒绝承兑","expectedNext":["MT430 amendment / return instruction"]},
+    "NON_PAID": {"zh":"拒付","expectedNext":["MT430","return of documents"]},
+    "PARTIALLY_PAID": {"zh":"部分付款","expectedNext":["MT400 for the rest"]},
+    "TRACER": {"zh":"已发查询（tracer MT420）待回复","expectedNext":["MT422 advice of fate"]},
+    "PAID": {"zh":"已付清","expectedNext":[]},
+    "RETURNED": {"zh":"单据已退回","expectedNext":[]}
+   },
+   "invariants": ["paidAmount + outstanding == amount","acceptedAmount <= amount","D/A requires tenor or maturity"]
+  }
+ }
+}

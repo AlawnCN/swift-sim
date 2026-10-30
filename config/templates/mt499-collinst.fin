@@ -1,0 +1,13 @@
+# Collection instruction (simulator convention - the instruction travels with the documents, no dedicated FIN MT in SR2025):
+# MT499 with :79: starting /COLLINST/<DP|DA|CLEAN|CASH>, then /URC522/ /AMOUNT/ /TENOR/ /MATURITY/ /DRAWER/ /DRAWEE/ /DOCS/ /CHARGES/ /PROTEST/
+:20:${ref}
+:21:NONREF
+:79:/COLLINST/${collType|'DP'}
+/URC522/
+/AMOUNT/${currency}${amount}
+/TENOR/${tenor|'AT SIGHT'}
+/DRAWER/INDIA TEXTILES PVT LTD (FICTIONAL) MUMBAI
+/DRAWEE/KENYA IMPORTS LTD (FICTIONAL) NAIROBI
+/DOCS/INVOICE 3, B/L 3-3, PACKING LIST 1
+/CHARGES/DRAWEE
+/PROTEST/NO

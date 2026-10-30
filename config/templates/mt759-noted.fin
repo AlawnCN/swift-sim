@@ -1,0 +1,9 @@
+# MT759 issuer follow-up after the SUT's MT787 / MT768 (general information advice)
+:27:1/1
+:20:${newRef}
+:21:${f20|ref}
+:22D:${ldg_form|'DGAR'}
+:23:${ref}
+:23H:GENINFAD
+:45D:${narrative|'NOTED'}
+UNDERTAKING ${ref} STATUS ${ldg_status|'NOTED'}

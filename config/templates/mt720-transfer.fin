@@ -1,0 +1,22 @@
+# MT720 Transfer of a documentary credit (virtual transferring bank -> SUT as advising bank of the second beneficiary)
+:27:1/1
+:40B:IRREVOCABLE TRANSFERABLE
+WITHOUT OUR CONFIRMATION
+:20:${newRef}
+:21:${ref}
+:31C:${today6}
+:40E:UCP LATEST VERSION
+:31D:${expiry6}NAIROBI
+:52A:${bic_ISSUING_BANK}
+:50:KENYA EXPORTS LTD (FICTIONAL)
+NAIROBI KENYA
+:59:DUBAI TRADING FZE (FICTIONAL)
+DUBAI UAE
+:32B:${currency}${transferAmount|lc_drawAmount|amount}
+:41D:ANY BANK
+BY NEGOTIATION
+:43P:ALLOWED
+:44C:${ship6}
+:45A:+1000 UNITS TEST MACHINERY PARTS (FICTIONAL)
+:46A:+SIGNED COMMERCIAL INVOICE IN 3 COPIES
+:49:WITHOUT

@@ -1,0 +1,7 @@
+# MT769 standalone reduction initiated by the (virtual) issuer -> SUT (advising): 33B amount reduced, 34B amount outstanding after it
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:33B:${currency}${reduction|ldg_halfOutstanding|amount}
+:34B:${currency}${remaining|ldg_remainingAfterHalf|'0,00'}
+:72Z:PARTIAL REDUCTION

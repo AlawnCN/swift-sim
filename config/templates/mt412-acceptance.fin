@@ -1,0 +1,5 @@
+# MT412 Advice of acceptance (collecting bank -> remitting bank): 32A = maturity date + amount of the accepted draft
+:20:${newRef}
+:21:${ref}
+:32A:${coll_maturity6|maturity6}${currency}${outstanding|amount}
+:72:DRAFT ACCEPTED BY THE DRAWEE

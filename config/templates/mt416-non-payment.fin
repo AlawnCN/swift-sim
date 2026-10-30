@@ -1,0 +1,7 @@
+# MT416 Advice of non-payment / non-acceptance (collecting bank -> remitting bank)
+:20:${newRef}
+:21:${ref}
+:21A:${ref}
+:32B:${currency}${outstanding|amount}
+:77A:${reason|'DRAWEE REFUSES TO PAY
+GOODS NOT ARRIVED'}

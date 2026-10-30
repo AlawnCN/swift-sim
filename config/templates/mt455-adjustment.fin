@@ -1,0 +1,7 @@
+# MT455 Cash letter credit adjustment advice (33C = credit adjustment, 33D = debit adjustment - simulator reading)
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:32A:${today6}${currency}${coll_paid|amount}
+:33D:${today6}${currency}${adjAmount|'100,00'}
+:77A:${reason|'CHARGES DEDUCTED - CREDIT ADJUSTED'}

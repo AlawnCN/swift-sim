@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTAKEN0XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>KEMX0013</BizMsgIdr>
+  <MsgDefIdr>tsin.005.001.01</MsgDefIdr>
+  <CreDt>2026-10-29T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsin.005.001.01">
+  <UdrtkgAppl>
+    <UdrtkgApplDtls>
+      <ApplcntRefNb>KEAPPL2026000001</ApplcntRefNb>
+      <Purp>ISSU</Purp>
+      <Nm>DGAR</Nm>
+      <Tp><Cd>PERF</Cd></Tp>
+      <Oblgr><Nm>KENYA IMPORTS LTD (FICTIONAL)</Nm></Oblgr>
+      <Issr><Nm>Virtual Issuing Bank London</Nm><Id><OrgId><AnyBIC>TSTBGB20XXX</AnyBIC></OrgId></Id></Issr>
+      <Bnfcry><Nm>EXAMPLE CONSTRUCTION CO (FICTIONAL)</Nm></Bnfcry>
+      <CntrUdrtkgInd>false</CntrUdrtkgInd>
+      <UdrtkgAmt><Amt Ccy="USD">50000.00</Amt></UdrtkgAmt>
+      <XpryDtls><XpryTerms><DtTm><Dt>2027-10-31</Dt></DtTm></XpryTerms></XpryDtls>
+      <GovncRulesAndLaw><RuleId><Cd>URDG</Cd></RuleId></GovncRulesAndLaw>
+      <UdrtkgWrdg><ReqdWrdgLang>en</ReqdWrdgLang><UdrtkgTermsAndConds><Txt>PLEASE ISSUE A PERFORMANCE GUARANTEE SUBJECT TO URDG 758. SIMULATED.</Txt></UdrtkgTermsAndConds></UdrtkgWrdg>
+      <DlvryChanl><Mtd>SWIF</Mtd><DlvrToPtyTp><Cd>BENE</Cd></DlvrToPtyTp></DlvryChanl>
+    </UdrtkgApplDtls>
+  </UdrtkgAppl>
+</Document>
+</RequestPayload>

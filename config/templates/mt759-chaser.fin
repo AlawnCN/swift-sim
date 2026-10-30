@@ -1,0 +1,9 @@
+# MT759 chaser - sent only while the query is still unanswered (fireWhen ldg_openQueryRef)
+:27:1/1
+:20:${newRef}
+:21:${ldg_openQueryRef|'NONREF'}
+:22D:${ldg_form|'DGAR'}
+:23:${ref}
+:23H:OTHERFNC
+:45D:CHASER - OUR QUERY ${ldg_openQueryRef|''} REMAINS UNANSWERED.
+PLEASE REPLY URGENTLY.

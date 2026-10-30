@@ -1,0 +1,6 @@
+# MT202 Cover for collection proceeds (collecting bank -> remitting bank). 21 = collection reference
+:20:${newRef}
+:21:${ref}
+:32A:${today6}${currency}${coll_paid|payAmount|amount}
+:58A:${toBic}
+:72:/BNF/COLLECTION ${ref}

@@ -1,0 +1,5 @@
+# MT799 Free format (documentary credit related)
+:20:${newRef}
+:21:${ref}
+:79:${narrative|'NOTED'}
+REFERENCE ${ref}

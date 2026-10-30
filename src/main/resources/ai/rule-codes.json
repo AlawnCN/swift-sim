@@ -1,0 +1,1146 @@
+{
+ "codes": [
+  {
+   "code": "BIZ-A01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "amendment",
+   "category_zh": "修改（amendment）序号/应答",
+   "example": "amendment no.  <…>  of  <…>  is still awaiting the beneficiary's response",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-A02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "amendment",
+   "category_zh": "修改（amendment）序号/应答",
+   "example": "amendment sequence number missing (expected  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-A03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "amendment",
+   "category_zh": "修改（amendment）序号/应答",
+   "example": "no amendment of  <…>  is awaiting a response",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-A04",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "amendment",
+   "category_zh": "修改（amendment）序号/应答",
+   "example": "amendment response code ' <…> ' not understood (simulator accepts ACPT/REJT for MT787, ACCP/REJT for tsrv.008)",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-C01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "currency",
+   "category_zh": "币种不一致",
+   "example": "currency mismatch: message uses  <…>  but undertaking  <…>  is in",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "demand amount  <…>   <…>  exceeds the outstanding amount  <…>",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "duplicate demand reference  <…>  for undertaking",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "demand  <…>  on  <…>  is still under examination",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D04",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "no demand  <…>  \" :",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D05",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "demand amount missing",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D06",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "extend-or-pay: requested expiry  <…>  is not later than the current expiry",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D07",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "demand  <…>  is a  <…>  demand, not extend-or-pay",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-D08",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "demand / claim (guarantee)",
+   "category_zh": "索赔/展期或付款请求",
+   "example": "payment  <…>  exceeds the demanded amount",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-K01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "accepted amount  <…>  exceeds the outstanding amount",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "duplicate collection reference  <…>  (already known, status  <…> )",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "collection amount missing (line /AMOUNT/CCYnnn,nn in :79:)",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K04",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "documents against acceptance require a usance tenor (/TENOR/nn DAYS AFTER SIGHT or /MATURITY/)",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K05",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "acknowledged amount  <…>  does not match the collection amount  <…>",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K06",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "advice of acceptance for a  <…>  collection (only documents against acceptance are accepted)",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K07",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "collection  <…>  is already paid - documents cannot be returned",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K08",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "existing amount  <…>  (32a) does not match the outstanding collection amount  <…>",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K09",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "the draft under  <…>  has already been accepted",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K10",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "amount debited  <…>  exceeds the amount credited so far",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K11",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "unknown collection type ' <…> ' (expected /COLLINST/DP, DA, CLEAN or CASH)",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-K12",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary collection",
+   "category_zh": "跟单托收",
+   "example": "no credit has been advised for  <…>  - nothing to adjust",
+   "source": "CollectionLedgerService.java"
+  },
+  {
+   "code": "BIZ-L01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "transferred amount  <…>  exceeds the available amount  <…>",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "partial drawing not allowed (43P NOT ALLOWED): ",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "presentation after expiry: documentary credit  <…>  expired on ",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L04",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "duplicate presentation reference  <…>  (already used, status  <…> )",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L05",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "no presentation ",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L06",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "refusal given later than 5 banking days after presentation (presented  <…> , deadline  <…> , business date",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L07",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "amount  <…>  exceeds the presented amount ",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L09",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "presentation  <…>  has already been paid",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L10",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "documentary credit  <…>  is not transferable (40A  <…> )",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L11",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "confirmation added although the issuing bank did not request/authorise it (49  <…> )",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L12",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "reimbursement authorisation  <…>  exceeds the credit amount incl. tolerance",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L13",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "authorisation to reimburse for  <…>  was already given to  <…>  (use MT747 to amend it)",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L14",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "new reimbursement amount  <…>  is below the amount already claimed",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L15",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "expiry of the transferred credit  <…>  is later than the expiry of the original credit",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L16",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "cancellation requested while documents are under examination ( <…>   <…>  presented)",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L20",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "no authorisation to reimburse (MT740) of  <…>  was given to",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L21",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "claim  <…>  exceeds the unclaimed reimbursement authorisation",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-L22",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "documentary credit (LC) / presentation / reimbursement",
+   "category_zh": "信用证、交单、偿付",
+   "example": "claim after the expiry of the reimbursement authorisation ( <…> )",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-M01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "money movement / outstanding",
+   "category_zh": "付款、减额、余额",
+   "example": "payment  <…>  exceeds the outstanding amount",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-M02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "money movement / outstanding",
+   "category_zh": "付款、减额、余额",
+   "example": "decrease  <…>  exceeds the outstanding amount  <…>",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-M03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "money movement / outstanding",
+   "category_zh": "付款、减额、余额",
+   "example": "amount outstanding  <…>  (34B) is inconsistent with the ledger: outstanding",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-R01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "routing / party role",
+   "category_zh": "收发行角色/路由不符",
+   "example": "sender  <…>  is not a party of undertaking  <…>  (parties:  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-R02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "routing / party role",
+   "category_zh": "收发行角色/路由不符",
+   "example": "receiver  <…>  is not a party of undertaking  <…>  (parties:  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-R03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "routing / party role",
+   "category_zh": "收发行角色/路由不符",
+   "example": "<…>  is not the bank the application  <…>  was sent to (issuer  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-R04",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "routing / party role",
+   "category_zh": "收发行角色/路由不符",
+   "example": "receiver  <…>  has role  <…>",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "BIZ-R05",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "routing / party role",
+   "category_zh": "收发行角色/路由不符",
+   "example": "demand  <…>  was presented by  <…> , not by",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-S01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "state / lifecycle",
+   "category_zh": "业务状态不允许该操作",
+   "example": "<…>  not allowed before issuance:  <…>  is only an application (APPLIED)",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-S02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "state / lifecycle",
+   "category_zh": "业务状态不允许该操作",
+   "example": "demand after expiry: undertaking  <…>  expired on  <…>  (business date  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-S03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "state / lifecycle",
+   "category_zh": "业务状态不允许该操作",
+   "example": "<…>  not allowed: undertaking  <…>  is",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-U01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "unknown or duplicate reference",
+   "category_zh": "编号未知或重复",
+   "example": "reference  <…>  does not match any undertaking known to",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-U02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "unknown or duplicate reference",
+   "category_zh": "编号未知或重复",
+   "example": "duplicate undertaking number  <…> : already known (status  <…> , issuer  <…> , issued  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-V00",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "content validation (guarantee)",
+   "category_zh": "保函内容校验",
+   "example": "undertaking number missing",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-V01",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "content validation (guarantee)",
+   "category_zh": "保函内容校验",
+   "example": "expiry date  <…>  is before the issue date",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-V02",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "content validation (guarantee)",
+   "category_zh": "保函内容校验",
+   "example": "expiry type FIXD but no expiry date given",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-V03",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "content validation (guarantee)",
+   "category_zh": "保函内容校验",
+   "example": "undertaking currency/amount missing",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-V04",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "content validation (guarantee)",
+   "category_zh": "保函内容校验",
+   "example": "expiry date  <…>  is already in the past (business date  <…> )",
+   "source": "LedgerService.java"
+  },
+  {
+   "code": "BIZ-V06",
+   "level": "BUSINESS",
+   "effect": "business reject / INCONSISTENT at receiver application (message itself was ACKed)",
+   "effect_zh": "业务层拒绝/不一致（网络已 ACK）",
+   "category": "content validation (guarantee)",
+   "category_zh": "保函内容校验",
+   "example": "latest date of shipment  <…>  (44C) is after the expiry date",
+   "source": "LcLedgerService.java"
+  },
+  {
+   "code": "SIM-A00",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "sender address",
+   "category_zh": "发报行地址",
+   "example": "sender BIC not determinable",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-A01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "sender address",
+   "category_zh": "发报行地址",
+   "example": "sender  <…>  is not a registered participant",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-C01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field charset/code",
+   "category_zh": "字段代码/字符集",
+   "example": "field : <…> : contains character ' <…> ' (U+",
+   "source": "SwiftFormat.java"
+  },
+  {
+   "code": "SIM-E00",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "envelope / format detection",
+   "category_zh": "报文格式识别",
+   "example": "empty message",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-E01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "envelope / format detection",
+   "category_zh": "报文格式识别",
+   "example": "cannot detect format: MT must start with {1:, MX with <",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-F01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field : <…> : must be 1-16 characters on one line",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-F02",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field : <…> : must not start/end with '/' or contain '//' (SWIFT error T26)",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-F03",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field : <…> : invalid date ' <…> ' (expected YYMMDD",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-F04",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field : <…> : must be 3!a15d with decimal comma, e.g. USD50000,00 (got ' <…> ')",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-F05",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field : <…> : must be 6!n3!a15d (date, currency, amount with decimal comma)",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-F06",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field :26E: must be 1-3 digits",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-F10",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "field format (MT)",
+   "category_zh": "字段格式",
+   "example": "field : <…> : value does not match SWIFT format",
+   "source": "SwiftFormat.java"
+  },
+  {
+   "code": "SIM-H01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "basic header block {1:} missing",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-H02",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "block 2 must be I + 3-digit MT + 12-char receiver LT address + [priority S/U/N][delivery monitoring 1/2/3][obsolescence 3n] (got ' <…> ')",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-H03",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "block 2 is in output format ({2:O...})",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-H04",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "block 4 must start with '{4:' followed by a line break",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-H10",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "MX without Business Application Header (AppHdr) not accepted",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-H11",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "AppHdr MsgDefIdr ' <…> ' does not match the Document namespace message ' <…> '",
+   "source": "MxHandler.java"
+  },
+  {
+   "code": "SIM-H12",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "?from= <…>  conflicts with AppHdr Fr",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-H21",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "MT <…>  requires block 3 field 121 (UETR)",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-H31",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "block 3 field 108 (MUR) must be 1-16 x characters",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-H32",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "headers (MT blocks 1-3 / MX AppHdr)",
+   "category_zh": "报头",
+   "example": "block 3 field 121 (UETR) must be a lower-case UUID version 4 (xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx)",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-M01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "mandatory field missing",
+   "category_zh": "必选字段缺失",
+   "example": "mandatory field : <…> : missing for MT",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT765: if field 22G is PAYM, field 31E is not allowed",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N02",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT765: field 77 must be present if and only if field 49A is INCP",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N10",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT <…> : fields 42C (drafts at) and 42a (drawee) must be present together",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N11",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT <…> : only one of [42C+42a], 42M (mixed payment) or 42P (deferred payment) may be present",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N12",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT <…> : either field 44C (latest date of shipment) or 44D (shipment period) may be present, not both",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N13",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT700: field 58a (requested confirmation party) is not allowed when field 49 is WITHOUT",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N14",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT <…> : last line of field 41a must be one of BY ACCEPTANCE, BY DEF PAYMENT, BY MIXED PYMT, BY NEGOTIATION, BY PAYMENT (got ' <…> ')",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N20",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT707: either field 32B (increase) or 33B (decrease) may be present, not both",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N30",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT747: at least one of 31E, 32B, 33B, 34B, 39A, 39C, 72Z or 77 must be present",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N31",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT747: if field 32B or 33B is present, field 34B (new amount) must also be present",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N32",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT747: either field 32B or 33B may be present, not both",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N40",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT752: if fields 32B and 71D are both present, field 33a (net amount) must also be present",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N41",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT754: either field 72Z or 77 may be present, not both",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N42",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT754: either field 53a or 57a may be present, not both",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N43",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT734: if field 73A (charges claimed) is present, field 33a (total amount claimed) must also be present",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-N50",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "network validated rule (C/D rules)",
+   "category_zh": "网络校验规则（字段组合）",
+   "example": "MT <…> : the currency code in the amount fields must be the same (field  <…> a  <…>  vs  <…> a  <…> )",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-P01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "FIN parse",
+   "category_zh": "FIN 解析",
+   "example": "FIN parse error:",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-P02",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "FIN parse",
+   "category_zh": "FIN 解析",
+   "example": "FIN message must contain blocks {1:}, {2:} and {4:}",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-P03",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "FIN parse",
+   "category_zh": "FIN 解析",
+   "example": "block 4 is empty",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-R00",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "receiver address",
+   "category_zh": "收报行地址",
+   "example": "receiver BIC not determinable",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-R01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "receiver address",
+   "category_zh": "收报行地址",
+   "example": "receiver  <…>  unknown in simulator directory",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-S01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "session / sequence (ISN)",
+   "category_zh": "会话/序号",
+   "example": "",
+   "source": "GatewayService.java"
+  },
+  {
+   "code": "SIM-T01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "message type not supported",
+   "category_zh": "报文类型不支持",
+   "example": "MT405 (clean collection) is not part of the SR2025 Category 4 message set (withdrawn",
+   "source": "MtHandler.java"
+  },
+  {
+   "code": "SIM-T02",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "message type not supported",
+   "category_zh": "报文类型不支持",
+   "example": "MX  <…>  not supported (supported:  <…> )",
+   "source": "MxHandler.java"
+  },
+  {
+   "code": "SIM-X01",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "XML / XSD (MX)",
+   "category_zh": "XML/XSD 校验",
+   "example": "XML not well-formed:",
+   "source": "MxHandler.java"
+  },
+  {
+   "code": "SIM-X02",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "XML / XSD (MX)",
+   "category_zh": "XML/XSD 校验",
+   "example": "no ISO 20022 <Document> element found (namespace  <…> ...)",
+   "source": "MxHandler.java"
+  },
+  {
+   "code": "SIM-X03",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "XML / XSD (MX)",
+   "category_zh": "XML/XSD 校验",
+   "example": "XSD  <…> :",
+   "source": "MxHandler.java"
+  },
+  {
+   "code": "SIM-X04",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "XML / XSD (MX)",
+   "category_zh": "XML/XSD 校验",
+   "example": "XSD validation failed:",
+   "source": "MxHandler.java"
+  },
+  {
+   "code": "SIM-X05",
+   "level": "NETWORK",
+   "effect": "NAK at gateway (message rejected, not delivered)",
+   "effect_zh": "网关 NAK（未投递）",
+   "category": "XML / XSD (MX)",
+   "category_zh": "XML/XSD 校验",
+   "example": "AppHdr (head.001.001.02) XSD:",
+   "source": "MxHandler.java"
+  }
+ ],
+ "note": "example = message template from simulator source; <…> marks values filled at runtime",
+ "note_zh": "example 为模拟器源代码中的提示模板，<…> 为运行时填入的值"
+}

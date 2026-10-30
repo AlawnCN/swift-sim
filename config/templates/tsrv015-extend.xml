@@ -1,0 +1,16 @@
+<!-- tsrv.015 ExtendOrPayResponse: Sts EXTD | PAYD -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.015.001.01">
+  <XtndOrPayRspn>
+    <XtndOrPayRspnDtls>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+      <DmndDtls>
+        <Id>${ldg_pendingDemandId|demandId}</Id>
+        <Amt Ccy="${currency}">${amountIso}</Amt>
+      </DmndDtls>
+      <Sts>${mxStatus|'EXTD'}</Sts>
+    </XtndOrPayRspnDtls>
+  </XtndOrPayRspn>
+</Document>

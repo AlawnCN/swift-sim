@@ -1,0 +1,1154 @@
+# Scenario engine configuration.
+#  - reactions: when a message of messageTypes is DELIVERED to a virtual bank listed in `to`
+#    (and all `when` conditions match the parsed variables), the `respond` steps are scheduled.
+#  - Scenarios sharing a `group` are mutually exclusive: only the active one reacts
+#    (activate via UI / POST /api/scenarios/{id}/activate, or force per message with ?scenario=ID / X-Sim-Scenario header).
+#  - kickoff: steps run when the scenario is triggered (UI button / POST /api/scenarios/{id}/trigger?format=MT|MX):
+#    a virtual bank sends the first message to your system.
+#  - step: delaySeconds, from/to ($receiver = bank that got the inbound msg, $sender = its sender, or participant id),
+#    mt / mx = template under config/templates (MT used for MT inbound, MX for MX inbound), vars, repeat, possibleDuplicate, note
+#  - template variables: ${name|fallback|'literal'}; see README for the list.
+scenarios:
+
+  # 1 ---------------------------------------------------------------- issuance
+  - id: happy-issuance
+    name: 开立+通知 Happy path issuance & advice
+    description: SUT sends MT760 / tsrv.001 to ADVISING_BANK -> after 2s advising bank acknowledges (MT768 / tsrv.019 ACCP). Kickoff = ISSUING_BANK issues MT760 / tsrv.001 to SUT.
+    group: issuance
+    default: true
+    reactions:
+      - messageTypes: [MT760, tsrv.001]
+        to: [ADVISING_BANK, BENEFICIARY_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: ISSU, status: ACCP, info: "UNDERTAKING ADVISED TO BENEFICIARY" }
+      - messageTypes: [tsin.005]
+        to: [ISSUING_BANK, ADVISING_BANK]
+        respond:
+          - delaySeconds: 2
+            mx: tsrv019-status.xml
+            vars: { statusCategory: APPL, status: ACCP, info: "APPLICATION RECEIVED, UNDERTAKING WILL BE ISSUED" }
+          - delaySeconds: 5
+            mx: tsrv001-issue.xml
+            vars: { issuerBic: "${fromBic}" }
+    kickoff:
+      - delaySeconds: 0
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt760-issue.fin
+        mx: tsrv001-issue.xml
+
+  - id: issuance-timeout
+    name: 开立无响应(超时) Issuance - no response
+    description: Advising bank never answers (test your timeout / chaser logic). Gateway ACK + delivery still happen.
+    group: issuance
+    reactions:
+      - messageTypes: [MT760, tsrv.001]
+        respond: []
+
+  - id: issuance-slow
+    name: 开立慢回执(15秒) Issuance - slow acknowledgement
+    description: Advising bank answers after 15 s (used to test that delayed responses survive a simulator restart).
+    group: issuance
+    reactions:
+      - messageTypes: [MT760, tsrv.001]
+        respond:
+          - delaySeconds: 15
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: ISSU, status: ACCP, info: "UNDERTAKING ADVISED (SLOW)" }
+
+  - id: issuance-duplicate
+    name: 重复回执 Issuance - duplicate ACK
+    description: Advising bank sends the MT768 / tsrv.019 twice; second copy flagged possible duplicate (PDE / PssblDplct).
+    group: issuance
+    reactions:
+      - messageTypes: [MT760, tsrv.001]
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            repeat: 2
+            possibleDuplicate: true
+            vars: { statusCategory: ISSU, status: ACCP }
+
+  # 2/3 -------------------------------------------------------------- amendment
+  - id: amendment-accepted
+    name: 修改被接受 Amendment accepted
+    description: SUT sends MT767 / tsrv.005 -> advising bank MT768 (1s) then beneficiary acceptance MT787 23R ACPT (3s) / tsrv.008 ACCP.
+    group: amendment
+    default: true
+    reactions:
+      - messageTypes: [MT767, tsrv.005]
+        to: [ADVISING_BANK, BENEFICIARY_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+          - delaySeconds: 3
+            mt: mt787-response.fin
+            mx: tsrv008-response.xml
+            vars: { status: ACPT, mxStatus: ACCP }
+            when: { ldg_amendmentStatus: PENDING }   # no consent response if the amendment was already effective
+
+  - id: amendment-rejected
+    name: 修改被拒绝 Amendment rejected
+    description: Same as above but beneficiary rejects - MT787 23R REJT + reason / tsrv.008 REJT.
+    group: amendment
+    reactions:
+      - messageTypes: [MT767, tsrv.005]
+        to: [ADVISING_BANK, BENEFICIARY_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+          - delaySeconds: 3
+            mt: mt787-response.fin
+            mx: tsrv008-response.xml
+            vars: { status: "REJT\nBENEFICIARY DOES NOT AGREE", mxStatus: REJT }
+            when: { ldg_amendmentStatus: PENDING }
+
+  - id: amendment-no-response
+    name: 修改待受益人答复 Amendment - beneficiary does not answer (yet)
+    description: Advising bank only acknowledges (MT768 / no MX reply); the amendment stays AMENDMENT_PENDING in the ledger.
+    group: amendment
+    reactions:
+      - messageTypes: [MT767, tsrv.005]
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+
+  # 4/5 -------------------------------------------------------------- demand
+  - id: demand-paid
+    name: 索赔付款 Demand paid
+    description: SUT (beneficiary bank) sends MT765 PAYM / tsrv.013 to ISSUING_BANK -> MT768 ack, MT202 settlement, MT769 reduction (MX - tsrv.019 ACCP; payment pacs.009 not simulated). Kickoff = BENEFICIARY_BANK presents MT765 demand to SUT (SUT = issuer).
+    group: demand
+    default: true
+    reactions:
+      - messageTypes: [MT765, tsrv.013]
+        to: [ISSUING_BANK]
+        when: { demandType: PAYM }
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: DMND, status: ACCP, info: "DEMAND ACCEPTED - PAYMENT WILL FOLLOW" }
+          - delaySeconds: 3
+            mt: mt202-settlement.fin
+          - delaySeconds: 4
+            mt: mt769-reduction.fin
+    kickoff:
+      - from: BENEFICIARY_BANK
+        to: SUT_BANK
+        mt: mt765-demand.fin
+        mx: tsrv013-demand.xml
+        vars: { demandType: PAYM, issuerBic: "${toBic}" }
+
+  - id: demand-refused
+    name: 索赔拒付(不符点) Demand refused - discrepancy
+    description: Issuer refuses the demand - MT786 with 77J reason / tsrv.016 with Dscrpncy.
+    group: demand
+    reactions:
+      - messageTypes: [MT765, tsrv.013]
+        to: [ISSUING_BANK]
+        when: { demandType: PAYM }
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+          - delaySeconds: 3
+            mt: mt786-refusal.fin
+            mx: tsrv016-refusal.xml
+            vars: { reason: "DISCREPANCY: DEMAND STATEMENT DOES\nNOT COMPLY WITH GUARANTEE TERMS" }
+    kickoff:
+      - from: BENEFICIARY_BANK
+        to: SUT_BANK
+        mt: mt765-demand.fin
+        mx: tsrv013-demand.xml
+        vars: { demandType: PAYM, issuerBic: "${toBic}" }
+
+  - id: demand-pending
+    name: 索赔审单中(不答复) Demand under examination - no answer
+    description: Issuer only acknowledges an MT765 (MT768) and does not pay/refuse; the demand stays pending (tests withdrawal, concurrency, review).
+    group: demand
+    reactions:
+      - messageTypes: [MT765, tsrv.013]
+        to: [ISSUING_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+
+  # 6 ---------------------------------------------------------------- extend or pay
+  - id: extend-or-pay
+    name: 延期或付款 Extend or pay
+    description: >
+      MT765 22G PAEX (+31E) / tsrv.013 Tp PAEX to ISSUING_BANK -> MT768 ack, then issuer extends via MT767 (new 31E) / tsrv.005 NewXpryDtls.
+      tsrv.014 ExtendOrPayRequest to APPLICANT_BANK -> tsrv.015 EXTD. MT759 to APPLICANT_BANK -> MT759 GENINFAD reply.
+      Kickoff = BENEFICIARY_BANK sends MT765 PAEX / tsrv.013 PAEX to SUT.
+    group: extend-or-pay
+    default: true
+    reactions:
+      - messageTypes: [MT765, tsrv.013]
+        to: [ISSUING_BANK]
+        when: { demandType: PAEX }
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: DMND, status: ACCP, info: "EXTEND OR PAY REQUEST RECEIVED" }
+          - delaySeconds: 4
+            mt: mt767-extension.fin
+            mx: tsrv005-extension.xml
+      - messageTypes: [tsrv.014]
+        to: [APPLICANT_BANK]
+        respond:
+          - delaySeconds: 3
+            mx: tsrv015-extend.xml
+            vars: { mxStatus: EXTD }
+      - messageTypes: [MT759]
+        to: [APPLICANT_BANK, ISSUING_BANK]
+        when: { ldg_queryAnswered: "!true", ldg_family: "!~^(LC|COLL)$" }
+        respond:
+          - delaySeconds: 3
+            mt: mt759-reply.fin
+            vars: { narrative: "APPLICANT AGREES TO EXTEND THE UNDERTAKING" }
+    kickoff:
+      - from: BENEFICIARY_BANK
+        to: SUT_BANK
+        mt: mt765-demand.fin
+        mx: tsrv013-demand.xml
+        vars:
+          demandType: PAEX
+          issuerBic: "${toBic}"
+          extra: ":31E:${newExpiry6}"
+          mxExtra: "<ReqdXpryDt>${newExpiryIso}</ReqdXpryDt>"
+
+  # 7 ---------------------------------------------------------------- non-extension
+  - id: non-extension
+    name: 不续期通知 Non-extension notice
+    description: SUT sends MT785 / tsrv.011 (or tsrv.010 request) -> ack (MT768 / tsrv.019). Kickoff = ISSUING_BANK sends MT785 / tsrv.011 to SUT.
+    group: non-extension
+    default: true
+    reactions:
+      - messageTypes: [MT785, tsrv.011, tsrv.010]
+        respond:
+          - delaySeconds: 2
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: NEXT, status: ACCP, info: "NON-EXTENSION NOTED" }
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt785-non-extension.fin
+        mx: tsrv011-non-extension.xml
+
+  # 8 ---------------------------------------------------------------- release / termination
+  - id: release-termination
+    name: 释放/终止 Release / termination
+    description: SUT sends MT769 / tsrv.012 (or tsrv.017 demand withdrawal) -> ack (MT768 / tsrv.019). Kickoff = ISSUING_BANK sends MT769 release / tsrv.012 to SUT.
+    group: release
+    default: true
+    reactions:
+      - messageTypes: [MT769, tsrv.012, tsrv.017]
+        respond:
+          - delaySeconds: 2
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: TERM, status: ACCP, info: "RELEASE / TERMINATION NOTED" }
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt769-release.fin
+        mx: tsrv012-termination.xml
+
+  # ================================================================ Stage 1: guarantee gaps (Cat 7 undertakings)
+  # 9 ---------------------------------------------------------------- issuer-initiated amendment (SUT = advising bank)
+  - id: issuer-amendment
+    name: 开证行发起修改(SUT为通知行) Issuer-initiated amendment to SUT (advising)
+    description: >
+      Kickoff only. ISSUING_BANK sends MT767 (32B increase + 31E new expiry) / tsrv.005 (new expiry) to the SUT for an undertaking
+      the SUT advised. The ledger sets AMENDMENT_PENDING; the SUT must answer MT787 23R ACPT|REJT (tsrv.008) - optionally MT768 / tsrv.019 first.
+      If the amendment is still pending after 60 s, the issuer chases with MT759 (skipped automatically once the SUT has answered).
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt767-issuer-amend.fin
+        mx: tsrv005-issuer-amend.xml
+      - delaySeconds: 60
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt759-amend-chaser.fin
+        fireWhen: { ldg_status: AMENDMENT_PENDING }
+        note: issuer chaser while the beneficiary's answer is outstanding
+
+  # 10 --------------------------------------------------------------- issuer follow-up after SUT's MT768 / MT787
+  - id: issuer-followup
+    name: 开证行跟进(收到MT787/MT768后) Issuer follow-up after SUT MT787 / MT768
+    description: >
+      SUT (advising) sends MT787 / tsrv.008 to ISSUING_BANK -> issuer confirms with MT759 GENINFAD (tsrv.019 ACCP).
+      SUT sends only MT768 / tsrv.019 while the amendment is still pending -> issuer stays silent (waits for MT787; its kickoff chaser covers the rest).
+    group: issuer-followup
+    default: true
+    reactions:
+      - messageTypes: [MT787, tsrv.008]
+        to: [ISSUING_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt759-noted.fin
+            mx: tsrv019-status.xml
+            vars: { narrative: "BENEFICIARY RESPONSE TO OUR AMENDMENT NOTED", statusCategory: AMND, status: ACCP, info: "AMENDMENT RESPONSE NOTED" }
+      - messageTypes: [MT768, tsrv.019]
+        to: [ISSUING_BANK]
+        when: { ldg_status: AMENDMENT_PENDING }
+        respond: []
+
+  - id: issuer-followup-silent
+    name: 开证行不跟进 Issuer follow-up - silent
+    description: ISSUING_BANK receives the SUT's MT787 / tsrv.008 and sends nothing back.
+    group: issuer-followup
+    reactions:
+      - messageTypes: [MT787, tsrv.008]
+        to: [ISSUING_BANK]
+        respond: []
+
+  # 11 --------------------------------------------------------------- standalone reduction
+  - id: issuer-reduction
+    name: 开证行减额通知(MT769) Issuer reduction advice to SUT
+    description: >
+      Kickoff only (MT). ISSUING_BANK sends MT769 with 33B = half of the outstanding amount and 34B = remaining amount
+      for an undertaking it issued and the SUT advised. Ledger reduces the outstanding amount; SUT may acknowledge with MT768.
+      (No ISO 20022 reduction message in tsrv v01 - MT only.)
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt769-reduction-kickoff.fin
+        select: UND_REDUCIBLE
+
+  # 12 --------------------------------------------------------------- demand withdrawal
+  - id: demand-withdrawal
+    name: 索赔后撤回 Demand then withdrawal
+    description: >
+      Kickoff. BENEFICIARY_BANK sends a PAYM demand (MT765 / tsrv.013) to the SUT (issuer), then after 20 s withdraws it with
+      MT759 (23H OTHERFNC, 45D "WITHDRAWAL OF DEMAND ...") / tsrv.017 - skipped if the SUT already paid or refused.
+      Ledger: demand WITHDRAWN, undertaking back to ISSUED.
+    kickoff:
+      - from: BENEFICIARY_BANK
+        to: SUT_BANK
+        mt: mt765-demand.fin
+        mx: tsrv013-demand.xml
+        vars: { demandType: PAYM, issuerBic: "${toBic}" }
+      - delaySeconds: 20
+        from: BENEFICIARY_BANK
+        to: SUT_BANK
+        mt: mt759-withdrawal.fin
+        mx: tsrv017-withdrawal.xml
+        vars: { issuerBic: "${toBic}" }
+        fireWhen: { ldg_pendingDemandId: "~." }
+
+  - id: demand-withdrawal-pending
+    name: 撤回未决索赔 Withdraw a pending demand
+    description: Kickoff. BENEFICIARY_BANK withdraws the newest demand still pending at the SUT (MT759 / tsrv.017).
+    kickoff:
+      - from: BENEFICIARY_BANK
+        to: SUT_BANK
+        mt: mt759-withdrawal.fin
+        mx: tsrv017-withdrawal.xml
+        select: UND_DEMAND_PENDING
+        vars: { issuerBic: "${toBic}" }
+
+  # 13 --------------------------------------------------------------- MT759 query + chaser
+  - id: query-chaser
+    name: MT759查询及催询 MT759 query and chaser
+    description: >
+      Kickoff (MT). ISSUING_BANK sends an MT759 query about an undertaking it shares with the SUT. The ledger records an open query;
+      the SUT answers with MT759 :21: = the query's :20:. After 45 s a chaser is sent - skipped automatically once answered.
+      Use ?from=ADVISING_BANK / BENEFICIARY_BANK / APPLICANT_BANK to ask as another counterparty.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt759-query.fin
+        select: UND_PARTIES
+      - delaySeconds: 45
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt759-chaser.fin
+        fireWhen: { ldg_openQueryRef: "~." }
+
+  - id: query-answered
+    name: 查询已答复 Query answered (no further message)
+    description: The SUT's MT759 answering an open query is absorbed by the asking bank (ledger QUERY_ANSWERED); nothing is sent back.
+    reactions:
+      - messageTypes: [MT759]
+        when: { ldg_queryAnswered: "true" }
+        respond: []
+
+  # ================================================================ Stage 2: documentary credits (Cat 7 LC, MT only)
+  # ---- SUT = issuing bank: reactions of the virtual advising / confirming bank
+  - id: lc-advice-ack
+    name: 信用证通知回执 LC advised - MT730 acknowledgement
+    description: SUT issues MT700 to ADVISING_BANK / CONFIRMING_BANK (or advises MT710 / transfers MT720 to a virtual bank) -> MT730 acknowledgement after 2 s.
+    group: lc-advice
+    default: true
+    reactions:
+      - messageTypes: [MT700, MT710, MT720]
+        to: [ADVISING_BANK, CONFIRMING_BANK, TRANSFEREE_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt730-ack.fin
+            vars: { ackLine: "/ACK/", narrative: "CREDIT ADVISED TO THE BENEFICIARY" }
+
+  - id: lc-advice-confirmed
+    name: 信用证保兑 LC advised and confirmed
+    description: MT700 -> MT730 with /CONFIRMED/ when 49 = CONFIRM or MAY ADD (ledger records the confirming bank), else a plain acknowledgement.
+    group: lc-advice
+    reactions:
+      - messageTypes: [MT700]
+        to: [ADVISING_BANK, CONFIRMING_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt730-ack.fin
+            when: { lc_confirmation: "~CONFIRM|MAY ADD" }
+            vars: { ackLine: "/CONFIRMED/", narrative: "WE HAVE ADDED OUR CONFIRMATION" }
+          - delaySeconds: 2
+            mt: mt730-ack.fin
+            when: { lc_confirmation: "!~CONFIRM|MAY ADD" }
+            vars: { ackLine: "/ACK/", narrative: "ADVISED WITHOUT OUR CONFIRMATION" }
+
+  - id: lc-advice-timeout
+    name: 信用证通知无回执 LC advice - no response
+    description: The advising bank never sends MT730 (test your chaser / timeout).
+    group: lc-advice
+    reactions:
+      - messageTypes: [MT700]
+        respond: []
+
+  - id: lc-advice-duplicate
+    name: 信用证重复回执 LC advice - duplicate MT730
+    description: MT730 sent twice, second copy flagged possible duplicate (PDE). The ledger ignores the duplicate.
+    group: lc-advice
+    reactions:
+      - messageTypes: [MT700]
+        to: [ADVISING_BANK, CONFIRMING_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt730-ack.fin
+            repeat: 2
+            possibleDuplicate: true
+
+  - id: lc-amendment-accepted
+    name: 信用证修改被受益人接受 LC amendment accepted
+    description: SUT sends MT707 -> MT730 acknowledgement (1 s), then MT730 /BENACC/ (4 s) = beneficiary accepts; amendment applied.
+    group: lc-amendment
+    default: true
+    reactions:
+      - messageTypes: [MT707]
+        to: [ADVISING_BANK, CONFIRMING_BANK, BENEFICIARY_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt730-ack.fin
+            vars: { ackLine: "/ACK/", narrative: "AMENDMENT ADVISED TO BENEFICIARY" }
+          - delaySeconds: 4
+            mt: mt730-ack.fin
+            vars: { ackLine: "/BENACC/", narrative: "BENEFICIARY ACCEPTS THE AMENDMENT" }
+
+  - id: lc-amendment-rejected
+    name: 信用证修改被拒绝 LC amendment rejected
+    description: MT707 -> MT730 ack, then MT730 /BENREJ/ = beneficiary rejects; the credit keeps its old terms.
+    group: lc-amendment
+    reactions:
+      - messageTypes: [MT707]
+        to: [ADVISING_BANK, CONFIRMING_BANK, BENEFICIARY_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt730-ack.fin
+            vars: { ackLine: "/ACK/", narrative: "AMENDMENT ADVISED TO BENEFICIARY" }
+          - delaySeconds: 4
+            mt: mt730-ack.fin
+            vars: { ackLine: "/BENREJ/BENEFICIARY DOES NOT AGREE", narrative: "AMENDMENT REJECTED BY BENEFICIARY" }
+
+  - id: lc-amendment-pending
+    name: 信用证修改待受益人答复 LC amendment - beneficiary silent
+    description: MT707 -> only the MT730 acknowledgement; the amendment stays pending (try a second MT707 = amendment-while-pending, BIZ-L05).
+    group: lc-amendment
+    reactions:
+      - messageTypes: [MT707]
+        to: [ADVISING_BANK, CONFIRMING_BANK, BENEFICIARY_BANK]
+        respond:
+          - delaySeconds: 1
+            mt: mt730-ack.fin
+            vars: { ackLine: "/ACK/", narrative: "BENEFICIARY RESPONSE AWAITED" }
+
+  # ---- SUT = issuing bank: reimbursing bank (MT740 / MT747) and the claim it pays
+  - id: lc-reimb-pays
+    name: 偿付行付款 Reimbursing bank honours claims
+    description: >
+      SUT sends MT740 / MT747 to REIMBURSING_BANK -> silently recorded (no ack in Cat 7). When a claim MT742 reaches REIMBURSING_BANK
+      (e.g. kickoff lc-claim-to-reimbursing) it pays the claimant with MT202 and debits the SUT with an MT799 advice.
+    group: lc-reimbursement
+    default: true
+    reactions:
+      - messageTypes: [MT740, MT747]
+        to: [REIMBURSING_BANK]
+        respond: []
+      - messageTypes: [MT742]
+        to: [REIMBURSING_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt202-lc-settlement.fin
+          - delaySeconds: 3
+            to: SUT_BANK
+            mt: mt799-free.fin
+            vars: { narrative: "CLAIM ${f20} PAID\nYOUR ACCOUNT DEBITED ${currency} ${lc_presAmount}" }
+
+  - id: lc-reimb-rejects
+    name: 偿付行拒付索偿 Reimbursing bank rejects claims
+    description: MT742 to REIMBURSING_BANK -> MT744 non-conforming claim to the claimant + MT799 information to the SUT.
+    group: lc-reimbursement
+    reactions:
+      - messageTypes: [MT740, MT747]
+        to: [REIMBURSING_BANK]
+        respond: []
+      - messageTypes: [MT742]
+        to: [REIMBURSING_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt744-claim-reject.fin
+          - delaySeconds: 3
+            to: SUT_BANK
+            mt: mt799-free.fin
+            vars: { narrative: "CLAIM ${f20} REJECTED\nNON-CONFORMING - SEE OUR MT744" }
+
+  - id: lc-claim-to-reimbursing
+    name: 议付行向偿付行索偿 Claim on the reimbursing bank (SUT issuer)
+    description: Kickoff. ADVISING_BANK claims on REIMBURSING_BANK (MT742) under an LC the SUT issued with a reimbursing bank (virtual -> virtual); the lc-reimbursement group decides the answer.
+    kickoff:
+      - from: ADVISING_BANK
+        to: REIMBURSING_BANK
+        mt: mt742-claim.fin
+        select: LC_CLAIM
+
+  # ---- SUT = issuing bank: presentations by the nominated bank
+  - id: lc-presentation
+    name: 交单(MT754)及催付 Presentation MT754 + chaser
+    description: >
+      Kickoff. ADVISING_BANK (nominated) advises a complying presentation with MT754 (half the available amount if partial drawings
+      are allowed, else the full amount) to the SUT issuer. If the presentation is still unpaid/unrefused after 60 s an MT799 chaser follows.
+      SUT answers MT756 + MT202 (pay), MT734 (refuse within 5 banking days) or MT732 (discharge).
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt754-presentation.fin
+        select: LC_PRESENT
+      - delaySeconds: 60
+        from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt799-chaser.fin
+        fireWhen: { lc_openPresentations: "!0" }
+
+  - id: lc-presentation-discrepant
+    name: 不符点交单(MT750) Discrepant presentation MT750
+    description: Kickoff. ADVISING_BANK sends MT750 advice of discrepancy; the SUT answers MT752 (authorise) or MT734 (refuse). MT799 chaser after 60 s if still open.
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt750-discrepancy.fin
+        select: LC_PRESENT
+        vars: { discrepancies: "+LATE SHIPMENT\n+INVOICE AMOUNT EXCEEDS CREDIT AMOUNT" }
+      - delaySeconds: 60
+        from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt799-chaser.fin
+        fireWhen: { lc_openPresentations: "!0" }
+
+  - id: lc-presentation-overdraw
+    name: 超额交单 Over-drawing presentation (beyond 39A)
+    description: Kickoff. MT754 for the available amount + 1000 (beyond the 39A tolerance). Expected - the SUT rejects it at business level.
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt754-presentation.fin
+        select: LC_PRESENT
+        vars: { drawAmount: "${lc_overAmount}", narrative: "DOCUMENTS NEGOTIATED" }
+
+  - id: lc-presentation-expired
+    name: 过期交单 Presentation under an expired LC
+    description: Kickoff. MT754 under a credit whose expiry date has passed (move the business date or use ?ref=). Expected - business rejection by the SUT.
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt754-presentation.fin
+        select: LC_PRESENT_EXPIRED
+
+  - id: lc-presentation-duplicate
+    name: 重复交单电文 Duplicate presentation (PDE)
+    description: Kickoff. The same MT754 sent twice, the second copy flagged possible duplicate - the SUT must not pay twice.
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt754-presentation.fin
+        select: LC_PRESENT
+        repeat: 2
+        possibleDuplicate: true
+
+  # ---- SUT = nominated / advising bank presenting to the virtual issuer
+  - id: lc-issuer-pays
+    name: 开证行付款 Issuer pays the SUT presentation
+    description: SUT sends MT754 to ISSUING_BANK / CONFIRMING_BANK -> MT756 (3 s) + MT202 cover (4 s). MT750 -> MT752 REMITTED (3 s) + MT202 (4 s).
+    group: lc-issuer
+    default: true
+    reactions:
+      - messageTypes: [MT754]
+        to: [ISSUING_BANK, CONFIRMING_BANK]
+        respond:
+          - delaySeconds: 3
+            mt: mt756-reimbursement.fin
+          - delaySeconds: 4
+            mt: mt202-lc-settlement.fin
+      - messageTypes: [MT750]
+        to: [ISSUING_BANK, CONFIRMING_BANK]
+        respond:
+          - delaySeconds: 3
+            mt: mt752-authorisation.fin
+            vars: { authCode: REMITTED }
+          - delaySeconds: 4
+            mt: mt202-lc-settlement.fin
+
+  - id: lc-issuer-refuses
+    name: 开证行拒付 Issuer refuses the SUT presentation
+    description: SUT MT754 / MT750 -> MT734 advice of refusal (77J discrepancies, 77B /HOLD/) after 3 s.
+    group: lc-issuer
+    reactions:
+      - messageTypes: [MT754, MT750]
+        to: [ISSUING_BANK, CONFIRMING_BANK]
+        respond:
+          - delaySeconds: 3
+            mt: mt734-refusal.fin
+
+  - id: lc-issuer-refuse-then-discharge
+    name: 拒付后申请人放弃不符点 Refusal, then waiver + payment
+    description: SUT MT754 / MT750 -> MT734 refusal (2 s), then MT732 advice of discharge (6 s) and MT202 payment (8 s).
+    group: lc-issuer
+    reactions:
+      - messageTypes: [MT754, MT750]
+        to: [ISSUING_BANK, CONFIRMING_BANK]
+        respond:
+          - delaySeconds: 2
+            mt: mt734-refusal.fin
+          - delaySeconds: 6
+            mt: mt732-discharge.fin
+          - delaySeconds: 8
+            mt: mt202-lc-settlement.fin
+
+  - id: lc-issuer-silent
+    name: 开证行无回复 Issuer silent on presentation
+    description: No answer to the SUT's MT754 / MT750 (test your chaser / 5-banking-day monitoring).
+    group: lc-issuer
+    reactions:
+      - messageTypes: [MT754, MT750]
+        respond: []
+
+  # ---- kickoffs: virtual issuer / banks -> SUT (advising, confirming, second advising, transferee, reimbursing)
+  - id: lc-advise
+    name: 收到信用证(MT700) Inbound LC for advising
+    description: Kickoff. ISSUING_BANK issues an MT700 (USD 50000, 39A 05/05, partial allowed, 49 WITHOUT) to the SUT as advising bank. SUT answers MT730.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt700-issue.fin
+
+  - id: lc-advise-confirm
+    name: 收到信用证并要求保兑 Inbound LC - confirmation requested
+    description: Kickoff. MT700 with 49 CONFIRM, available with the SUT by payment. SUT answers MT730 /CONFIRMED/ (or plain MT730).
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt700-issue.fin
+        vars: { confirm: CONFIRM, availWith: "${toBic}", availBy: "BY PAYMENT" }
+
+  - id: lc-advise-strict
+    name: 不许分批的信用证 Inbound LC - partial drawings not allowed, no tolerance
+    description: Kickoff. MT700 with 43P NOT ALLOWED and 39A 00/00 (use to test BIZ-L02 partial drawing / BIZ-L01 over-drawing).
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt700-issue.fin
+        vars: { partial: NOT ALLOWED, tolerance: "00/00" }
+
+  - id: lc-advise-reimb
+    name: 收到带偿付行的信用证 Inbound LC with a reimbursing bank
+    description: Kickoff. MT700 naming REIMBURSING_BANK in 53A - the SUT (nominated) can later claim with MT742 on the reimbursing bank.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt700-issue.fin
+        vars: { reimbLine: ":53A:${bic_REIMBURSING_BANK}" }
+
+  - id: lc-advise-transferable
+    name: 收到可转让信用证 Inbound transferable LC
+    description: Kickoff. MT700 40A IRREVOCABLE TRANSFERABLE - the SUT may transfer it with MT720 to TRANSFEREE_BANK.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt700-issue.fin
+        vars: { lcForm: IRREVOCABLE TRANSFERABLE }
+
+  - id: lc-pre-advice
+    name: 预通知后开证 Pre-advice MT705 then MT700
+    description: Kickoff. ISSUING_BANK sends MT705 pre-advice, then the operative MT700 with the same credit number 10 s later.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt705-pre-advice.fin
+      - delaySeconds: 10
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt700-issue.fin
+
+  - id: lc-amend-inbound
+    name: 收到信用证修改(MT707) Inbound LC amendment
+    description: Kickoff. ISSUING_BANK sends MT707 (32B increase 10 %, 31D +3 months) for an LC the SUT advised. SUT answers MT730 /BENACC/ or /BENREJ/.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt707-amend.fin
+        select: LC_AMEND
+
+  - id: lc-cancel-inbound
+    name: 收到信用证撤销请求 Inbound cancellation request (MT707 23S CANCEL)
+    description: Kickoff. ISSUING_BANK requests cancellation; effective only after the SUT's MT730 /BENACC/.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt707-cancel.fin
+        select: LC_AMEND
+
+  - id: lc-third-bank-advice
+    name: 第二通知行(MT710) Advice of a third bank's LC
+    description: Kickoff. ADVISING_BANK (first advising bank) advises a credit of ISSUING_BANK to the SUT as second advising bank with MT710.
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt710-advice.fin
+        select: NEW_LC
+
+  - id: lc-transfer-inbound
+    name: 信用证转让(MT720) Transferred LC to the SUT
+    description: >
+      Kickoff. ISSUING_BANK issues a transferable MT700 to CONFIRMING_BANK (virtual -> virtual), which 5 s later transfers it to the SUT
+      (advising bank of the second beneficiary) with MT720.
+    kickoff:
+      - from: ISSUING_BANK
+        to: CONFIRMING_BANK
+        mt: mt700-issue.fin
+        vars: { lcForm: IRREVOCABLE TRANSFERABLE }
+      - delaySeconds: 5
+        from: CONFIRMING_BANK
+        to: SUT_BANK
+        mt: mt720-transfer.fin
+
+  - id: lc-issuer-payment
+    name: 开证行付款(MT756+MT202) Issuer pays an open SUT presentation
+    description: Kickoff. ISSUING_BANK pays the newest open presentation of the SUT - MT756, then MT202 cover 2 s later.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt756-reimbursement.fin
+        select: LC_PRESENTATION_PAYABLE
+      - delaySeconds: 2
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt202-lc-settlement.fin
+
+  - id: lc-issuer-refusal
+    name: 开证行拒付(MT734) Issuer refuses an open SUT presentation
+    description: Kickoff. ISSUING_BANK refuses the newest presentation still under examination with MT734.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt734-refusal.fin
+        select: LC_PRESENTATION_PENDING
+
+  - id: lc-issuer-discharge
+    name: 开证行放单付款(MT732+MT202) Issuer discharges a refused presentation
+    description: Kickoff. For a presentation refused earlier, ISSUING_BANK sends MT732 (applicant waived) and the MT202 payment 2 s later.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt732-discharge.fin
+        select: LC_PRESENTATION_REFUSED
+      - delaySeconds: 2
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt202-lc-settlement.fin
+
+  - id: lc-issuer-authorise
+    name: 开证行授权付款(MT752) Issuer authorises a discrepant SUT presentation
+    description: Kickoff. Answer to the SUT's MT750 - MT752 23 REMITTED, then MT202 2 s later.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt752-authorisation.fin
+        select: LC_PRESENTATION_DISCREPANT
+        vars: { authCode: REMITTED }
+      - delaySeconds: 2
+        from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt202-lc-settlement.fin
+
+  - id: lc-reimb-auth-inbound
+    name: 收到偿付授权(MT740) Inbound reimbursement authorisation
+    description: Kickoff. ISSUING_BANK authorises the SUT (reimbursing bank) with MT740 for a new credit number.
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt740-reimb-auth.fin
+        select: NEW_LC
+
+  - id: lc-reimb-amend-inbound
+    name: 收到偿付授权修改(MT747) Inbound reimbursement amendment
+    description: Kickoff. ISSUING_BANK amends its MT740 with MT747 (32B increase, 31E new expiry).
+    kickoff:
+      - from: ISSUING_BANK
+        to: SUT_BANK
+        mt: mt747-reimb-amend.fin
+
+  - id: lc-claim-inbound
+    name: 收到索偿(MT742) Inbound reimbursement claim
+    description: Kickoff. ADVISING_BANK claims on the SUT (reimbursing bank) with MT742. SUT pays (MT202 + debit advice to the issuer) or rejects (MT744).
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt742-claim.fin
+        select: LC_CLAIM
+
+  - id: lc-claim-overclaim
+    name: 超额索偿 Claim above the reimbursement authorisation
+    description: Kickoff. MT742 for more than the reimbursement authorisation available. Expected - the SUT rejects (MT744 or business rejection).
+    kickoff:
+      - from: ADVISING_BANK
+        to: SUT_BANK
+        mt: mt742-claim.fin
+        select: LC_CLAIM
+        vars: { drawAmount: "${lc_overAmount}" }
+
+  # ================================================================ Stage 3: documentary collections (Cat 4, MT only)
+  # Collection instruction = MT499 :79:/COLLINST/<DP|DA|CLEAN|CASH> (simulator convention, see README)
+  # ---- SUT = remitting bank: reactions of the virtual collecting bank
+  - id: coll-paid
+    name: 托收付款(D/P付款;D/A承兑后到期付款) Collection paid
+    description: >
+      SUT sends the collection instruction (MT499 /COLLINST/) to COLLECTING_BANK -> MT410 acknowledgement (2 s).
+      D/P, CLEAN, CASH: MT400 advice of payment (5 s) + MT202 cover (6 s). D/A: MT412 acceptance (5 s), then MT400 + MT202 at "maturity" (10/11 s).
+    group: coll-remit
+    default: true
+    reactions:
+      - messageTypes: [MT499]
+        to: [COLLECTING_BANK]
+        when: { f79: "~^/COLLINST/" }
+        respond:
+          - delaySeconds: 2
+            mt: mt410-ack.fin
+          - delaySeconds: 5
+            mt: mt400-payment.fin
+            when: { coll_type: "!DA" }
+          - delaySeconds: 6
+            mt: mt202-coll-cover.fin
+            when: { coll_type: "!DA" }
+            fireWhen: { coll_paid: "~[1-9]" }
+          - delaySeconds: 5
+            mt: mt412-acceptance.fin
+            when: { coll_type: DA }
+          - delaySeconds: 10
+            mt: mt400-payment.fin
+            when: { coll_type: DA }
+          - delaySeconds: 11
+            mt: mt202-coll-cover.fin
+            when: { coll_type: DA }
+            fireWhen: { coll_paid: "~[1-9]" }
+
+  - id: coll-accepted
+    name: 托收承兑(D/A) Collection accepted, payment at maturity
+    description: Instruction -> MT410 (2 s) + MT412 advice of acceptance (5 s) with the maturity date; nothing more (pay later via review or kickoff coll-payment).
+    group: coll-remit
+    reactions:
+      - messageTypes: [MT499]
+        to: [COLLECTING_BANK]
+        when: { f79: "~^/COLLINST/" }
+        respond:
+          - delaySeconds: 2
+            mt: mt410-ack.fin
+          - delaySeconds: 5
+            mt: mt412-acceptance.fin
+
+  - id: coll-partial
+    name: 托收部分付款 Collection partially paid
+    description: Instruction -> MT410 (2 s), MT400 for half the amount (5 s) + MT202 (6 s). The collection stays PARTIALLY_PAID.
+    group: coll-remit
+    reactions:
+      - messageTypes: [MT499]
+        to: [COLLECTING_BANK]
+        when: { f79: "~^/COLLINST/" }
+        respond:
+          - delaySeconds: 2
+            mt: mt410-ack.fin
+          - delaySeconds: 5
+            mt: mt400-payment.fin
+            vars: { payAmount: "${coll_halfOutstanding}" }
+          - delaySeconds: 6
+            mt: mt202-coll-cover.fin
+            fireWhen: { coll_paid: "~[1-9]" }
+
+  - id: coll-non-payment
+    name: 托收拒付/拒绝承兑 Non-payment / non-acceptance
+    description: Instruction -> MT410 (2 s), then MT416 advice of non-payment / non-acceptance (5 s).
+    group: coll-remit
+    reactions:
+      - messageTypes: [MT499]
+        to: [COLLECTING_BANK]
+        when: { f79: "~^/COLLINST/" }
+        respond:
+          - delaySeconds: 2
+            mt: mt410-ack.fin
+          - delaySeconds: 5
+            mt: mt416-non-payment.fin
+
+  - id: coll-no-response
+    name: 代收行无回复 Collecting bank silent
+    description: No MT410 / MT4xx at all - send an MT420 tracer from your system (answered by the coll-tracer group).
+    group: coll-remit
+    reactions:
+      - messageTypes: [MT499]
+        when: { f79: "~^/COLLINST/" }
+        respond: []
+
+  - id: coll-duplicate-ack
+    name: 重复托收回执 Duplicate MT410
+    description: MT410 sent twice (second copy PDE) - your system must ignore the duplicate.
+    group: coll-remit
+    reactions:
+      - messageTypes: [MT499]
+        to: [COLLECTING_BANK]
+        when: { f79: "~^/COLLINST/" }
+        respond:
+          - delaySeconds: 1
+            mt: mt410-ack.fin
+            repeat: 2
+            possibleDuplicate: true
+
+  - id: coll-cash-dishonour
+    name: 光票托收入账后退票 Cash letter credited, then dishonoured
+    description: Instruction (use collType CASH / CLEAN) -> MT450 cash letter credit advice (3 s), then MT456 advice of dishonour (8 s).
+    group: coll-remit
+    reactions:
+      - messageTypes: [MT499]
+        to: [COLLECTING_BANK]
+        when: { f79: "~^/COLLINST/" }
+        respond:
+          - delaySeconds: 3
+            mt: mt450-cash-credit.fin
+          - delaySeconds: 8
+            mt: mt456-dishonour.fin
+            fireWhen: { coll_paid: "~[1-9]" }
+
+  - id: coll-tracer-answer
+    name: 查询托收结果 Tracer answered (MT422)
+    description: SUT sends MT420 tracer to COLLECTING_BANK -> MT422 advice of fate (3 s).
+    group: coll-tracer
+    default: true
+    reactions:
+      - messageTypes: [MT420]
+        to: [COLLECTING_BANK]
+        respond:
+          - delaySeconds: 3
+            mt: mt422-fate.fin
+
+  - id: coll-tracer-returned
+    name: 查询-单据已退回 Tracer - documents returned
+    description: MT420 -> MT422 with /RETURNED/ (collection closed as RETURNED).
+    group: coll-tracer
+    reactions:
+      - messageTypes: [MT420]
+        to: [COLLECTING_BANK]
+        respond:
+          - delaySeconds: 3
+            mt: mt422-fate.fin
+            vars: { fate: "/RETURNED/DOCUMENTS RETURNED\nDRAWEE DID NOT TAKE UP" }
+
+  - id: coll-tracer-silent
+    name: 查询无回复 Tracer ignored
+    description: MT420 is not answered.
+    group: coll-tracer
+    reactions:
+      - messageTypes: [MT420]
+        respond: []
+
+  - id: coll-amend-noted
+    name: 托收修改确认 Collection amendment noted
+    description: SUT sends MT430 to COLLECTING_BANK -> MT499 "AMENDMENT NOTED" (3 s); MT430 with /RETURN/ in 74 -> MT422 /RETURNED/ (3 s).
+    group: coll-amend
+    default: true
+    reactions:
+      - messageTypes: [MT430]
+        to: [COLLECTING_BANK]
+        when: { f74: "!~/RETURN/" }
+        respond:
+          - delaySeconds: 3
+            mt: mt499-free.fin
+            vars: { narrative: "YOUR AMENDMENT MT430 ${f20} NOTED" }
+      - messageTypes: [MT430]
+        to: [COLLECTING_BANK]
+        when: { f74: "~/RETURN/" }
+        respond:
+          - delaySeconds: 3
+            mt: mt422-fate.fin
+            vars: { fate: "/RETURNED/DOCUMENTS RETURNED\nAS INSTRUCTED" }
+
+  # ---- SUT = collecting bank: reactions of the virtual remitting bank
+  - id: coll-remitter-instructs
+    name: 委托行处理拒付 Remitting bank instructs after non-payment
+    description: SUT sends MT416 to REMITTING_BANK -> MT430 asking to return the documents (3 s). SUT MT422 (not /RETURNED/) -> MT430 amount reduction (3 s).
+    group: coll-remitter
+    default: true
+    reactions:
+      - messageTypes: [MT416]
+        to: [REMITTING_BANK]
+        respond:
+          - delaySeconds: 3
+            mt: mt430-return.fin
+      - messageTypes: [MT422]
+        to: [REMITTING_BANK]
+        when: { coll_milestone: "!RETURNED" }
+        respond:
+          - delaySeconds: 3
+            mt: mt430-amend.fin
+
+  - id: coll-remitter-silent
+    name: 委托行无指示 Remitting bank silent
+    description: The remitting bank sends no instructions after MT416 / MT422.
+    group: coll-remitter
+    reactions:
+      - messageTypes: [MT416, MT422]
+        respond: []
+
+  # ---- kickoffs: virtual remitting / collecting bank -> SUT
+  - id: coll-instruction-dp
+    name: 收到即期付款交单托收(D/P) Inbound D/P collection + tracer
+    description: >
+      Kickoff. REMITTING_BANK sends a D/P collection instruction (MT499 /COLLINST/DP) to the SUT (collecting bank).
+      SUT answers MT410, then MT400 + MT202 (or MT416 / MT422). If still unacknowledged after 60 s an MT420 tracer follows.
+    kickoff:
+      - from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt499-collinst.fin
+        vars: { collType: DP }
+      - delaySeconds: 60
+        from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt420-tracer.fin
+        fireWhen: { coll_milestone: "~^(SENT|INSTRUCTED|RECEIVED)$" }
+
+  - id: coll-instruction-da
+    name: 收到承兑交单托收(D/A) Inbound D/A collection + tracer
+    description: Kickoff. D/A instruction (tenor 60 DAYS AFTER SIGHT). SUT answers MT410, MT412 acceptance, later MT400. MT420 tracer after 60 s if not yet accepted/paid.
+    kickoff:
+      - from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt499-collinst.fin
+        vars: { collType: DA, tenor: "60 DAYS AFTER SIGHT" }
+      - delaySeconds: 60
+        from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt420-tracer.fin
+        fireWhen: { coll_milestone: "~^(SENT|INSTRUCTED|RECEIVED|ACKNOWLEDGED)$" }
+
+  - id: coll-instruction-clean
+    name: 收到光票托收 Inbound clean collection
+    description: Kickoff. CLEAN collection instruction (financial documents only).
+    kickoff:
+      - from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt499-collinst.fin
+        vars: { collType: CLEAN }
+
+  - id: coll-tracer-inbound
+    name: 收到托收查询(MT420) Inbound tracer
+    description: Kickoff. REMITTING_BANK traces its newest live collection held by the SUT with MT420. SUT answers MT422 (or MT400 / MT416).
+    kickoff:
+      - from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt420-tracer.fin
+
+  - id: coll-amend-inbound
+    name: 收到托收修改(MT430) Inbound collection amendment
+    description: Kickoff. REMITTING_BANK reduces the amount to half the outstanding amount with MT430 (32A old / 33A new).
+    kickoff:
+      - from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt430-amend.fin
+
+  - id: coll-return-inbound
+    name: 收到退单指示 Inbound instruction to return documents
+    description: Kickoff. REMITTING_BANK asks the SUT to return the documents unpaid (MT430 74 /RETURN/). SUT answers MT422 /RETURNED/.
+    kickoff:
+      - from: REMITTING_BANK
+        to: SUT_BANK
+        mt: mt430-return.fin
+
+  - id: coll-payment
+    name: 代收行付款(MT400+MT202) Collecting bank pays the SUT
+    description: Kickoff. COLLECTING_BANK pays the newest SUT collection awaiting payment - MT400, then MT202 cover 2 s later.
+    kickoff:
+      - from: COLLECTING_BANK
+        to: SUT_BANK
+        mt: mt400-payment.fin
+        select: COLL_PAYABLE
+      - delaySeconds: 2
+        from: COLLECTING_BANK
+        to: SUT_BANK
+        mt: mt202-coll-cover.fin
+        fireWhen: { coll_paid: "~[1-9]" }
+
+  - id: coll-adjustment-inbound
+    name: 收到入账调整(MT455) Inbound credit adjustment
+    description: Kickoff. COLLECTING_BANK adjusts a paid SUT collection with MT455 (33D debit adjustment 100,00 for charges).
+    kickoff:
+      - from: COLLECTING_BANK
+        to: SUT_BANK
+        mt: mt455-adjustment.fin
+        select: COLL_PAID
+
+  - id: coll-dishonour-inbound
+    name: 收到退票通知(MT456) Inbound advice of dishonour
+    description: Kickoff. COLLECTING_BANK dishonours a paid SUT cash letter / clean collection with MT456.
+    kickoff:
+      - from: COLLECTING_BANK
+        to: SUT_BANK
+        mt: mt456-dishonour.fin
+        select: COLL_PAID
+
+  # ---------------------------------------------------------------- trade fallback (before generic-ack)
+  - id: trade-no-reply
+    name: 贸易报文默认不回复 Trade messages - no automatic reply (fallback)
+    description: >
+      LC / collection messages without a specific reaction are recorded in the ledger but not answered
+      (Cat 4 / LC traffic has no generic acknowledgement message). MT202 / MT103 / MT759 / MT799 / MT499 linked to an LC or collection likewise.
+    fallback: true
+    reactions:
+      - messageTypes: [MT700, MT701, MT705, MT707, MT708, MT710, MT711, MT720, MT721, MT730, MT732, MT734, MT740, MT742, MT744, MT747, MT750, MT752, MT754, MT756,
+                       MT400, MT410, MT412, MT416, MT420, MT422, MT430, MT450, MT455, MT456, MT499, MT799]
+        respond: []
+      - messageTypes: [MT202, MT103, MT759]
+        when: { ldg_family: "~^(LC|COLL)$" }
+        respond: []
+
+  # ---------------------------------------------------------------- generic fallback
+  - id: generic-ack
+    name: 通用回执 Generic acknowledgement (fallback)
+    description: Any other supported message to a virtual bank gets MT768 (MT) / tsrv.019 ACCP (MX).
+    fallback: true
+    reactions:
+      - messageTypes: ["*"]
+        respond:
+          - delaySeconds: 1
+            mt: mt768-ack.fin
+            mx: tsrv019-status.xml
+            vars: { statusCategory: GENR, status: ACCP }

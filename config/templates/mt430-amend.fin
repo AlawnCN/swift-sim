@@ -1,0 +1,7 @@
+# MT430 Amendment of a collection instruction (remitting bank -> collecting bank): 32A existing, 33A amended maturity/amount
+:20:${ref}
+:21:${coll_collectingRef|'NONREF'}
+:32A:${coll_maturity6|maturity6}${currency}${outstanding|amount}
+:33A:${coll_maturity6|maturity6}${currency}${newAmount|coll_halfOutstanding|amount}
+:74:${instructions|'AMOUNT REDUCED AS AGREED
+WITH THE DRAWER'}

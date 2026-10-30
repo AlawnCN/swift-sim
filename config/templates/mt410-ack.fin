@@ -1,0 +1,5 @@
+# MT410 Acknowledgement of a collection (collecting bank -> remitting bank). 21 = remitting bank's collection reference
+:20:${newRef}
+:21:${ref}
+:32B:${currency}${coll_amount|amount}
+:72:/ACK/COLLECTION RECEIVED

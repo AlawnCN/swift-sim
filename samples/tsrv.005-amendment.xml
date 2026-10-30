@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTAKEN0XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTCKEN0XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>KEMX0002</BizMsgIdr>
+  <MsgDefIdr>tsrv.005.001.01</MsgDefIdr>
+  <CreDt>2026-10-29T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.005.001.01">
+  <UdrtkgAmdmnt>
+    <UdrtkgAmdmntDtls>
+      <SeqNb>1</SeqNb>
+      <DtOfIssnc>2026-10-30</DtOfIssnc>
+      <UdrtkgId><Id>KEGTEE2026MX0001</Id><Issr><Nm>Your System Kenya Test Bank</Nm><Id><OrgId><AnyBIC>TSTAKEN0XXX</AnyBIC></OrgId></Id></Issr></UdrtkgId>
+      <UdrtkgAmtAdjstmnt><AmtChc><IncrAmt Ccy="USD">10000.00</IncrAmt></AmtChc></UdrtkgAmtAdjstmnt>
+      <NewXpryDtls><XpryTerms><DtTm><Dt>2028-01-31</Dt></DtTm></XpryTerms></NewXpryDtls>
+      <BnfcryCnsntReqInd>true</BnfcryCnsntReqInd>
+    </UdrtkgAmdmntDtls>
+  </UdrtkgAmdmnt>
+</Document>
+</RequestPayload>

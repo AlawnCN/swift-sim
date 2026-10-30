@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTAKEN0XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTDKEN0XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>KEMX0010</BizMsgIdr>
+  <MsgDefIdr>tsrv.016.001.01</MsgDefIdr>
+  <CreDt>2026-10-29T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.016.001.01">
+  <DmndRfslNtfctn>
+    <DmndRfslNtfctnDtls>
+      <UdrtkgId><Id>KEGTEE2026MX0001</Id><Issr><Nm>Your System Kenya Test Bank</Nm><Id><OrgId><AnyBIC>TSTAKEN0XXX</AnyBIC></OrgId></Id></Issr></UdrtkgId>
+      <DmndDtls><Id>BENDMD0003</Id><SubmissnDtTm>2026-10-29T09:00:00</SubmissnDtTm><Amt Ccy="USD">50000.00</Amt></DmndDtls>
+      <Sts>REFUSED</Sts>
+      <Dscrpncy><Id>D1</Id><Nrrtv>DEMAND STATEMENT MISSING</Nrrtv></Dscrpncy>
+    </DmndRfslNtfctnDtls>
+  </DmndRfslNtfctn>
+</Document>
+</RequestPayload>

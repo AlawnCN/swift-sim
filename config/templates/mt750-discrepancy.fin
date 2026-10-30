@@ -1,0 +1,5 @@
+# MT750 Advice of discrepancy (nominated / presenting bank -> issuing bank): asks authorisation to pay despite discrepancies
+:20:${newRef}
+:21:${ref}
+:32B:${currency}${drawAmount|lc_drawAmount|amount}
+:77J:${discrepancies|'+LATE PRESENTATION'}

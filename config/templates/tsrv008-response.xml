@@ -1,0 +1,13 @@
+<!-- tsrv.008 UndertakingAmendmentResponse: AmdmntSts ACCP | REJT (no reason element in v01) -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.008.001.01">
+  <UdrtkgAmdmntRspn>
+    <UdrtkgAmdmntRspnDtls>
+      <AmdmntId>
+        <Id>${ref}</Id>
+        <SeqNb>${amendmentNo|'1'}</SeqNb>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </AmdmntId>
+      <AmdmntSts>${mxStatus|'ACCP'}</AmdmntSts>
+    </UdrtkgAmdmntRspnDtls>
+  </UdrtkgAmdmntRspn>
+</Document>

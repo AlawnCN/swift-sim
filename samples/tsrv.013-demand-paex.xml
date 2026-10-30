@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTAKEN0XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>KEMX0003PAEX</BizMsgIdr>
+  <MsgDefIdr>tsrv.013.001.01</MsgDefIdr>
+  <CreDt>2026-10-29T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.013.001.01">
+  <UdrtkgDmnd>
+    <UdrtkgDmndDtls>
+      <Id>KEDMDMXPAEX</Id>
+      <Tp>PAEX</Tp>
+      <UdrtkgId><Id>GBGTEE2026000777</Id><Issr><Id><OrgId><AnyBIC>TSTBGB20XXX</AnyBIC></OrgId></Id></Issr></UdrtkgId>
+      <DmndAmt><Amt Ccy="USD">25000.00</Amt></DmndAmt>
+      <ReqdXpryDt>2027-12-31</ReqdXpryDt>
+      <DmndDcmnttn><CmpltInd>true</CmpltInd><DmndNrrtv>WE HEREBY DEMAND PAYMENT OF USD 25,000.00 UNDER YOUR GUARANTEE GBGTEE2026000777 AND STATE THAT THE APPLICANT IS IN BREACH. SIMULATED.</DmndNrrtv></DmndDcmnttn>
+    </UdrtkgDmndDtls>
+  </UdrtkgDmnd>
+</Document>
+</RequestPayload>

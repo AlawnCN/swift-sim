@@ -1,0 +1,19 @@
+<!-- tsrv.001 UndertakingIssuance (kickoff from ISSUING_BANK, or issuer's answer to tsin.005) -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.001.001.01">
+  <UdrtkgIssnc>
+    <UdrtkgIssncDtls>
+      <Id>${ref}</Id>
+      <Nm>DGAR</Nm>
+      <IssncTp>ISSU</IssncTp>
+      <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      <Bnfcry><Nm>EXAMPLE SUPPLIES LTD (FICTIONAL)</Nm></Bnfcry>
+      <DtOfIssnc>${todayIso}</DtOfIssnc>
+      <UdrtkgAmt><Amt Ccy="${currency}">${amountIso}</Amt></UdrtkgAmt>
+      <XpryDtls>
+        <XpryTerms><DtTm><Dt>${expiryIso}</Dt></DtTm></XpryTerms>
+      </XpryDtls>
+      <GovncRulesAndLaw><RuleId><Cd>URDG</Cd></RuleId></GovncRulesAndLaw>
+      <UdrtkgTermsAndConds><Txt>WE HEREBY ISSUE OUR DEMAND GUARANTEE NO ${ref}. SIMULATED TEST MESSAGE - NO VALUE.</Txt></UdrtkgTermsAndConds>
+    </UdrtkgIssncDtls>
+  </UdrtkgIssnc>
+</Document>

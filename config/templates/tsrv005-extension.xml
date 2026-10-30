@@ -1,0 +1,19 @@
+<!-- tsrv.005 UndertakingAmendment extending expiry (issuer's answer to extend-or-pay) -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.005.001.01">
+  <UdrtkgAmdmnt>
+    <UdrtkgAmdmntDtls>
+      <SeqNb>${nextAmendmentNo|amendmentNo|'1'}</SeqNb>
+      <DtOfIssnc>${todayIso}</DtOfIssnc>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+      <NewXpryDtls>
+        <XpryTerms>
+          <DtTm><Dt>${newExpiryIso}</Dt></DtTm>
+        </XpryTerms>
+        <AddtlXpryInf>EXTENDED FOLLOWING EXTEND OR PAY DEMAND ${ldg_pendingDemandId|demandId}</AddtlXpryInf>
+      </NewXpryDtls>
+    </UdrtkgAmdmntDtls>
+  </UdrtkgAmdmnt>
+</Document>

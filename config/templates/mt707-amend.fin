@@ -1,0 +1,15 @@
+# MT707 Amendment to a documentary credit (virtual issuing bank -> SUT): increase (32B) + new expiry (31D)
+# 20 = sender's reference, 21 = receiver's reference (NONREF), 23 = issuing bank's reference (credit number)
+:27:1/1
+:20:${ref}
+:21:NONREF
+:23:${ref}
+:52A:${issuerBic}
+:31C:${lc_issueDate6|today6}
+:26E:${nextAmendmentNo|'1'}
+:30:${today6}
+:22A:ISSU
+:31D:${lc_newExpiry6|newExpiry6}${lc_expiryPlace|'NAIROBI'}
+:32B:${currency}${lc_increase|'1000,00'}
+:72Z:SIMULATED AMENDMENT
+INCREASE AND EXTENSION

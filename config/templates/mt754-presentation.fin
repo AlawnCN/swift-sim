@@ -1,0 +1,6 @@
+# MT754 Advice of payment / acceptance / negotiation (nominated bank -> issuing / confirming bank). 21 = credit number, 20 = presentation reference
+:20:${newRef}
+:21:${ref}
+:32A:${today6}${currency}${drawAmount|lc_drawAmount|amount}
+:72Z:${narrative|'DOCUMENTS COMPLY - NEGOTIATED'}
+${!extra|''}

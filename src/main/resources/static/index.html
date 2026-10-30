@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>SWIFT 报文模拟器 (保函 / 备用证)</title>
+<style>
+ body{font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;background:#f4f6f8;color:#222;font-size:13px}
+ header{background:#0b3d5c;color:#fff;padding:10px 16px}
+ header h1{font-size:17px;margin:0} header small{opacity:.8}
+ main{display:grid;grid-template-columns:1fr 430px;gap:12px;padding:12px}
+ section{background:#fff;border-radius:6px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+ h2{font-size:14px;margin:0 0 8px}
+ table{border-collapse:collapse;width:100%} th,td{border-bottom:1px solid #e3e6ea;padding:4px 6px;text-align:left;vertical-align:top}
+ th{background:#f0f2f5;position:sticky;top:0} tr:hover{background:#eef6ff;cursor:pointer}
+ .IN{color:#0a6} .OUT{color:#06c} .SYS{color:#888} .INTERNAL{color:#a60}
+ .st-NAK{color:#c00;font-weight:bold} .st-ACK{color:#0a6} .st-DELIVERED{color:#06c}
+ pre{background:#111;color:#cfe;padding:8px;white-space:pre-wrap;word-break:break-all;max-height:340px;overflow:auto;font-size:12px}
+ input,select,textarea,button{font:inherit} textarea{width:100%;height:220px;font-family:monospace;font-size:12px}
+ button{background:#0b3d5c;color:#fff;border:0;border-radius:4px;padding:4px 10px;cursor:pointer} button.sec{background:#6c7a89}
+ .scen{border:1px solid #e3e6ea;border-radius:4px;padding:6px;margin-bottom:6px} .scen.active{border-color:#0a6;background:#f2fbf6}
+ .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+ .tbl{max-height:62vh;overflow:auto}
+ nav{display:flex;gap:4px;padding:8px 12px 0} nav button{background:#c9d3dc;color:#222} nav button.on{background:#0b3d5c;color:#fff}
+ .view{display:none} .view.on{display:grid}
+ .b-APPLIED{color:#0a6} .b-REJECTED,.b-INCONSISTENT{color:#c00;font-weight:bold} .b-DUPLICATE_IGNORED{color:#a60}
+ .tl{border-left:3px solid #0b3d5c;margin-left:6px;padding-left:10px} .tl div{margin-bottom:6px}
+ .tl .ev-BUSINESS_REJECTED,.tl .ev-INCONSISTENT_MESSAGE{color:#c00} .badge{display:inline-block;padding:1px 6px;border-radius:8px;background:#e3eef8;margin-right:4px}
+ .kv td:first-child{color:#666;white-space:nowrap}
+</style>
+</head>
+<body>
+<header><h1>SWIFT 报文模拟器 — 保函 / 备用信用证 (MT 76x/78x/759 + ISO 20022 tsrv/tsin)</h1>
+<small>仅供测试。所有 BIC 均为虚构测试代码。服务仅监听 localhost。</small></header>
+<nav><button id="tab-log" class="on" onclick="tab('log')">报文</button><button id="tab-ldg" onclick="tab('ldg')">交易台账 / 状态机</button>
+<button id="tab-rv" onclick="tab('rv')">人工 / AI 审核队列 <span id="rvCount"></span></button>
+<span style="margin-left:auto">营业日 <input id="bizDate" type="date"> <button class="sec" onclick="setBiz()">设置</button> <button class="sec" onclick="resetBiz()">恢复今天</button></span></nav>
+<main id="v-log" class="view on">
+<div>
+ <section>
+  <h2>报文日志</h2>
+  <div class="row">
+   交易参考号 <input id="fRef" size="18" placeholder="txRef / relatedRef">
+   收报行 <input id="fTo" size="12" placeholder="BIC 或 ID">
+   类型 <input id="fType" size="10" placeholder="MT760 / tsrv">
+   方向 <select id="fDir"><option value="">全部</option><option>IN</option><option>OUT</option><option>INTERNAL</option><option>SYS</option></select>
+   <button onclick="load()">查询</button>
+   <label><input type="checkbox" id="auto" checked> 自动刷新</label>
+   <button class="sec" onclick="clearLog()">清空日志</button>
+  </div>
+  <div class="tbl"><table><thead><tr><th>ID</th><th>时间</th><th>方向</th><th>发报行</th><th>收报行</th><th>类型</th><th>交易参考</th><th>网络状态</th><th>业务</th><th>场景</th></tr></thead>
+  <tbody id="rows"></tbody></table></div>
+ </section>
+ <section style="margin-top:12px">
+  <h2>报文详情 <span id="detTitle"></span></h2>
+  <div id="detMeta"></div>
+  <pre id="detRaw">点击上方一行查看原文</pre>
+ </section>
+</div>
+<div>
+ <section>
+  <h2>场景 (同组内只有一个处于激活状态)</h2>
+  <div class="row">触发报文格式 <select id="trigFmt"><option>MT</option><option>MX</option></select>
+   交易号(可选) <input id="trigRef" size="16"></div>
+  <div id="scen"></div>
+ </section>
+ <section style="margin-top:12px">
+  <h2>以某虚拟行/本系统身份发送报文</h2>
+  <div class="row">样例 <select id="sample" onchange="loadSample()"><option value="">-- 选择样例 --</option></select></div>
+  <div class="row">From <select id="sFrom"><option value="">(取自报文头)</option></select>
+   To <select id="sTo"><option value="">(取自报文头)</option></select></div>
+  <div class="row">MT 类型(仅裸 block4 时) <input id="sMt" size="4" placeholder="760">
+   强制场景 <select id="sScen"><option value="">(使用激活场景)</option></select></div>
+  <textarea id="sBody" placeholder="粘贴 MT (FIN) 或 MX (XML) 报文"></textarea>
+  <div class="row"><button onclick="send()">发送</button></div>
+  <pre id="sResult"></pre>
+ </section>
+</div>
+</main>
+<main id="v-ldg" class="view">
+<div><section><h2>交易台账 (保函 / 备用证)</h2>
+ <div class="row">状态 <input id="uSt" size="14" placeholder="ADVISED ..."> 参与行 <input id="uParty" size="14" placeholder="BIC / ID"> <button onclick="loadU()">查询</button>
+ <button class="sec" onclick="if(confirm('清空台账(不删报文)?'))j('/api/undertakings',{method:'DELETE'}).then(loadU)">清空台账</button></div>
+ <div class="tbl"><table><thead><tr><th>交易号</th><th>状态</th><th>格式</th><th>币种/余额</th><th>到期</th><th>开立行</th><th>更新</th></tr></thead><tbody id="uRows"></tbody></table></div>
+</section></div>
+<div><section><h2>交易详情 <span id="uTitle"></span></h2><div id="uDet">点击左侧一笔交易</div></section></div>
+</main>
+<main id="v-rv" class="view">
+<div><section><h2>待审核报文 (审核模式的虚拟行收到的报文不会自动回复)</h2>
+ <div class="row"><label><input type="checkbox" id="rvAll"> 含已处理</label> <button onclick="loadRv()">刷新</button></div>
+ <div class="tbl"><table><thead><tr><th>ID</th><th>状态</th><th>虚拟行</th><th>报文</th><th>交易</th><th>台账校验</th><th>处理</th></tr></thead><tbody id="rvRows"></tbody></table></div>
+</section></div>
+<div><section><h2>审核模式开关</h2><div id="rvModes"></div></section>
+<section style="margin-top:12px"><h2>回复 <span id="rvTitle"></span></h2>
+ <div class="row">动作 <select id="rvAct"></select> 金额 <input id="rvAmt" size="10"> 新到期日 <input id="rvExp" type="date"></div>
+ <div class="row">理由(每行一条) </div><textarea id="rvReasons" style="height:60px"></textarea>
+ <div class="row">CUSTOM: MT 类型 <input id="rvMt" size="4"> (raw 可为完整报文或裸 block4)</div><textarea id="rvRaw" style="height:100px"></textarea>
+ <div class="row"><button onclick="rvSend()">提交</button></div><pre id="rvRes"></pre></section></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let parts=[];
+async function j(url,opt){const r=await fetch(url,opt);const t=await r.text();try{return JSON.parse(t)}catch(e){return t}}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function pname(bic){const p=parts.find(p=>p.bic===bic);return p?bic+'<br><small>'+esc(p.id)+'</small>':esc(bic)}
+async function load(){
+ const q=new URLSearchParams({limit:300,includeRaw:false});
+ if($('fRef').value)q.set('ref',$('fRef').value); if($('fTo').value)q.set('to',$('fTo').value);
+ if($('fType').value)q.set('type',$('fType').value); if($('fDir').value)q.set('direction',$('fDir').value);
+ const list=await j('/api/messages?'+q);
+ $('rows').innerHTML=list.map(m=>`<tr onclick="show(${m.id})"><td>${m.id}</td><td>${new Date(m.createdAt).toLocaleTimeString()}</td>
+ <td class="${m.direction}">${m.direction}</td><td>${pname(m.senderBic)}</td><td>${pname(m.receiverBic)}</td><td>${esc(m.msgType)}</td>
+ <td>${esc(m.txRef)}${m.relatedRef?'<br><small>'+esc(m.relatedRef)+'</small>':''}</td><td class="st-${m.status}">${esc(m.status)}</td><td class="b-${m.businessStatus}"><small>${esc(m.businessStatus)}</small></td><td><small>${esc(m.scenarioId)}</small></td></tr>`).join('');
+}
+async function show(id){
+ const m=await j('/api/messages/'+id);
+ $('detTitle').textContent='#'+m.id+' '+m.msgType+' '+m.status;
+ $('detMeta').innerHTML=`<div>渠道 ${esc(m.channel)} · 回复于 #${esc(m.inReplyTo)} · Prowide: ${esc(m.prowideClass)} · outbox: ${esc(m.outboxFile)} · webhook: ${esc(m.webhookStatus)}</div>`+
+  `<div>MIR ${esc(m.mir)} · MOR ${esc(m.mor)} · session ${esc(m.sessionNo)} ISN ${esc(m.isn)} OSN ${esc(m.osn)} · MUR ${esc(m.mur)} · UETR ${esc(m.uetr)} · PDE ${esc(m.possibleDuplicate)}${m.duplicateOf?' (原报文 #'+m.duplicateOf+')':''}</div>`+
+  `<div>交易 ${m.undertakingRef?`<a href="#" onclick="openU('${esc(m.undertakingRef)}');return false">${esc(m.undertakingRef)}</a>`:'-'} · 业务结果 <span class="b-${m.businessStatus}">${esc(m.businessStatus)}</span> ${esc(m.businessReason)}</div>`+
+  (m.statusReason?`<div class="st-NAK">原因: <pre>${esc(m.statusReason)}</pre></div>`:'')+(m.warnings?`<div>警告: <pre>${esc(m.warnings)}</pre></div>`:'');
+ $('detRaw').textContent=m.raw+(m.deliveredRaw&&m.deliveredRaw!==m.raw?'\n\n---- 投递给收报行的格式 (output / 带 trailer) ----\n'+m.deliveredRaw:'');
+}
+async function loadScen(){
+ const d=await j('/api/scenarios');
+ $('scen').innerHTML=d.scenarios.map(s=>`<div class="scen ${s.active?'active':''}"><b>${esc(s.name)}</b> <small>[${esc(s.id)}${s.group?' / 组 '+esc(s.group):''}]</small>
+  <div><small>${esc(s.description)}</small></div><div class="row" style="margin:4px 0 0">
+  ${s.group&&!s.active?`<button onclick="act('${s.id}')">激活</button>`:''}
+  ${s.hasKickoff?`<button onclick="trig('${s.id}')">触发 (虚拟行先发报)</button>`:''}
+  <small>响应: ${esc(s.reactsTo.join(', '))}</small></div></div>`).join('');
+ $('sScen').innerHTML='<option value="">(使用激活场景)</option>'+d.scenarios.map(s=>`<option>${s.id}</option>`).join('');
+}
+async function act(id){await j('/api/scenarios/'+id+'/activate',{method:'POST'});loadScen()}
+async function trig(id){const vars={};if($('trigRef').value)vars.ref=$('trigRef').value;
+ const r=await j('/api/scenarios/'+id+'/trigger?format='+$('trigFmt').value,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(vars)});
+ $('sResult').textContent=JSON.stringify(r,null,2);loadScen();setTimeout(load,500)}
+async function loadParts(){parts=await j('/api/participants');
+ const o=parts.map(p=>`<option value="${p.id}">${p.id} (${p.bic})</option>`).join('');
+ $('sFrom').innerHTML='<option value="">(取自报文头)</option>'+o;$('sTo').innerHTML='<option value="">(取自报文头)</option>'+o;}
+async function loadSamples(){const l=await j('/api/samples');$('sample').innerHTML='<option value="">-- 选择样例 --</option>'+l.map(n=>`<option>${n}</option>`).join('')}
+async function loadSample(){const n=$('sample').value;if(n)$('sBody').value=await j('/api/samples/'+encodeURIComponent(n))}
+async function send(){const q=new URLSearchParams({channel:'UI'});
+ if($('sFrom').value)q.set('from',$('sFrom').value);if($('sTo').value)q.set('to',$('sTo').value);
+ if($('sMt').value)q.set('mtType',$('sMt').value);if($('sScen').value)q.set('scenario',$('sScen').value);
+ const r=await j('/api/messages?'+q,{method:'POST',headers:{'Content-Type':'text/plain'},body:$('sBody').value});
+ $('sResult').textContent=JSON.stringify(r,null,2);setTimeout(load,300)}
+async function clearLog(){if(confirm('确定清空全部日志?')){await j('/api/messages',{method:'DELETE'});load()}}
+let curTab='log',curItem=null,curU=null;
+function tab(t){curTab=t;['log','ldg','rv'].forEach(x=>{$('v-'+x).classList.toggle('on',x===t);$('tab-'+x).classList.toggle('on',x===t)});if(t==='ldg')loadU();if(t==='rv'){loadRv();loadModes()}}
+async function loadU(){const q=new URLSearchParams();if($('uSt').value)q.set('status',$('uSt').value);if($('uParty').value)q.set('party',$('uParty').value);
+ const l=await j('/api/undertakings?'+q);$('uRows').innerHTML=l.map(u=>`<tr onclick="openU('${esc(u.ref)}')"><td>${esc(u.ref)}<br><small>${esc(u.form)} ${esc(u.rules)}</small></td><td><b>${esc(u.status)}</b></td><td>${esc(u.format)}</td>
+ <td>${esc(u.currency)} ${esc(u.outstanding)}<br><small>金额 ${esc(u.amount)}</small></td><td>${esc(u.expiryType)} ${esc(u.expiryDate)}</td><td>${pname(u.issuerBic)}</td><td><small>${new Date(u.updatedAt).toLocaleString()}</small></td></tr>`).join('')}
+async function openU(ref){curU=ref;if(curTab!=='ldg')tab('ldg');const d=await j('/api/undertakings/'+encodeURIComponent(ref));
+ if(!d.ref){$('uDet').innerHTML='<pre>'+esc(JSON.stringify(d,null,2))+'</pre>';return}
+ $('uTitle').textContent=d.ref+' · '+d.status;
+ const kv=[['里程碑',d.milestone],['金额/余额',d.currency+' '+d.amount+' / '+d.outstanding+' (原始 '+d.originalAmount+')'],['开立日',d.issueDate],['到期',d.expiryType+' '+(d.expiryDate||'')],
+  ['规则',d.rules],['受益人',d.beneficiary],['申请人',d.applicant],['不展期通知',d.nonExtensionNotified]];
+ $('uDet').innerHTML=`<table class="kv">${kv.map(([k,v])=>`<tr><td>${k}</td><td>${esc(v)}</td></tr>`).join('')}</table>
+ <h2 style="margin-top:8px">参与方</h2>${d.parties.map(p=>`<span class="badge">${esc(p.role)}: ${esc(p.bic)} ${esc(p.participantId||'')}</span>`).join('')}
+ <h2 style="margin-top:8px">修改</h2>${d.amendments.map(a=>`<div>#${a.seqNo} <b>${esc(a.status)}</b> +${esc(a.increase||0)} -${esc(a.decrease||0)} 新到期 ${esc(a.newExpiryDate||'-')} <small>${esc(a.note||'')}</small></div>`).join('')||'-'}
+ <h2 style="margin-top:8px">索赔</h2>${d.demands.map(x=>`<div>${esc(x.demandRef)} ${esc(x.type)} ${esc(x.currency)} ${esc(x.amount)} <b>${esc(x.status)}</b> by ${esc(x.presenterBic)} ${x.requestedExpiry?'展期至 '+esc(x.requestedExpiry):''} <small>${esc(x.reason||'')}</small></div>`).join('')||'-'}
+ <h2 style="margin-top:8px">余额变动</h2>${d.movements.map(m=>`<div>${esc(m.type)} ${esc(m.currency)} ${esc(m.amount)} → 余额 ${esc(m.outstandingAfter)} <small>${esc(m.note||'')}</small></div>`).join('')||'-'}
+ <h2 style="margin-top:8px">状态时间轴</h2><div class="tl">${d.history.map(e=>`<div class="ev-${e.eventType}"><small>${new Date(e.at).toLocaleString()} · 营业日 ${esc(e.businessDate)}</small><br>
+  <b>${esc(e.eventType)}</b> ${e.fromStatus&&e.fromStatus!==e.toStatus?esc(e.fromStatus)+' → '+esc(e.toStatus):esc(e.toStatus||'')}
+  ${e.messageId?`<a href="#" onclick="tab('log');show(${e.messageId});return false">#${e.messageId} ${esc(e.msgType)}</a>`:''}<br><small>${esc(e.detail)}</small></div>`).join('')}</div>
+ <h2 style="margin-top:8px">相关报文</h2>${d.messages.map(m=>`<div><a href="#" onclick="tab('log');show(${m.id});return false">#${m.id}</a> ${esc(m.direction)} ${esc(m.msgType)} ${esc(m.senderBic)}→${esc(m.receiverBic)} ${esc(m.status)} <span class="b-${m.businessStatus}">${esc(m.businessStatus||'')}</span></div>`).join('')}`}
+async function loadRv(){const l=await j('/api/review-queue'+($('rvAll').checked?'?status=ALL':''));
+ $('rvRows').innerHTML=l.map(i=>`<tr onclick="pickRv(${i.id})"><td>${i.id}</td><td>${esc(i.status)}</td><td>${esc(i.participantId)}</td><td>${esc(i.msgType)}<br><small>from ${esc(i.senderBic)}</small></td>
+ <td>${esc(i.txRef)}</td><td class="b-${i.ledgerVerdict}">${esc(i.ledgerVerdict)}<br><small>${esc(i.ledgerErrors||'')}</small></td><td><small>${esc(i.responseAction||'')}</small></td></tr>`).join('');
+ const n=l.filter(i=>i.status==='PENDING_REVIEW').length;$('rvCount').textContent=n?'('+n+')':''}
+async function loadModes(){const ps=await j('/api/participants');$('rvModes').innerHTML=ps.filter(p=>!p.sut).map(p=>`<label style="display:block"><input type="checkbox" ${p.reviewMode?'checked':''} onchange="setMode('${p.id}',this.checked)"> ${esc(p.id)} (${esc(p.bic)})</label>`).join('')}
+async function setMode(id,on){await j('/api/participants/'+id+'/review-mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:on})})}
+async function pickRv(id){const d=await j('/api/review-queue/'+id);curItem=id;$('rvTitle').textContent='#'+id+' '+d.item.msgType+' '+(d.item.txRef||'');
+ $('rvAct').innerHTML=d.actions.map(a=>`<option>${a}</option>`).join('');$('rvRes').textContent=(d.message&&d.message.raw)||''}
+async function rvSend(){if(!curItem)return;const b={action:$('rvAct').value};if($('rvAmt').value)b.amount=$('rvAmt').value;if($('rvExp').value)b.newExpiry=$('rvExp').value;
+ const rs=$('rvReasons').value.split('\n').map(x=>x.trim()).filter(x=>x);if(rs.length)b.reasons=rs;if($('rvRaw').value.trim())b.raw=$('rvRaw').value;if($('rvMt').value)b.mtType=$('rvMt').value;
+ const r=await j('/api/review-queue/'+curItem+'/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});$('rvRes').textContent=JSON.stringify(r,null,2);loadRv()}
+async function loadBiz(){const d=await j('/api/admin/business-date');$('bizDate').value=d.businessDate}
+async function setBiz(){if($('bizDate').value){const r=await j('/api/admin/business-date',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:$('bizDate').value})});alert('营业日 '+r.businessDate+', 到期处理 '+r.expiredNow+' 笔')}}
+async function resetBiz(){await j('/api/admin/business-date',{method:'DELETE'});loadBiz()}
+loadParts().then(load);loadScen();loadSamples();loadBiz();loadRv();
+setInterval(()=>{if(!$('auto').checked)return;if(curTab==='log')load();else if(curTab==='ldg'){loadU();if(curU)openU(curU)}else loadRv()},3000);
+</script>
+</body>
+</html>

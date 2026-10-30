@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>SWIFT 模拟器管理端</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}body{font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;background:#f2f4f7;color:#1f2933;font-size:13px}
+#side{position:fixed;left:0;top:0;bottom:0;width:168px;background:#0b3d5c;color:#dfe9f1;padding-top:8px}
+#side h1{font-size:15px;margin:6px 14px 14px;color:#fff}#side a{display:block;padding:8px 16px;color:#dfe9f1;text-decoration:none}
+#side a.on,#side a:hover{background:#155a83;color:#fff}#side .foot{position:absolute;bottom:10px;left:14px;font-size:11px;opacity:.8}
+#main{margin-left:168px;padding:14px 18px}
+h2{font-size:16px;margin:0 0 12px}h3{font-size:14px;margin:14px 0 6px}
+.card{background:#fff;border-radius:6px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.08);margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.stat{background:#fff;border-radius:6px;padding:10px 12px;box-shadow:0 1px 2px rgba(0,0,0,.08)}.stat b{font-size:20px;display:block}
+table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #e4e7eb;padding:4px 6px;text-align:left;vertical-align:top}
+th{background:#f0f2f5;position:sticky;top:0;z-index:1}tr.click:hover{background:#eaf4ff;cursor:pointer}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+input,select,textarea,button{font:inherit}input,select{padding:3px 5px;border:1px solid #c5ccd3;border-radius:4px}
+textarea{width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid #c5ccd3;border-radius:4px;padding:6px}
+button{background:#0b3d5c;color:#fff;border:0;border-radius:4px;padding:4px 10px;cursor:pointer}button.sec{background:#6c7a89}button.warn{background:#b54708}button.danger{background:#b42318}
+button:disabled{opacity:.5;cursor:default}
+pre{background:#0f1720;color:#d5f5e3;padding:8px;white-space:pre-wrap;word-break:break-all;max-height:420px;overflow:auto;font-size:12px;margin:4px 0}
+.IN{color:#067647}.OUT{color:#175cd3}.SYS{color:#888}.INTERNAL{color:#b54708}
+.st-NAK,.b-REJECTED,.b-INCONSISTENT,.sev-ERROR{color:#b42318;font-weight:600}.st-ACK,.b-APPLIED{color:#067647}.st-DELIVERED{color:#175cd3}.sev-WARN{color:#b54708;font-weight:600}.sev-INFO{color:#475467}
+.badge{display:inline-block;padding:1px 7px;border-radius:9px;background:#e3eef8;margin:0 3px 3px 0;font-size:12px}.badge.on{background:#d1fadf;color:#05603a}.badge.red{background:#fee4e2;color:#912018}
+.kv td:first-child{color:#667085;white-space:nowrap;width:150px}.muted{color:#667085}.small{font-size:12px}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.scroll{max-height:68vh;overflow:auto}#toast{position:fixed;right:16px;bottom:16px;background:#1f2933;color:#fff;padding:8px 14px;border-radius:6px;display:none;max-width:520px;white-space:pre-wrap;z-index:9}
+.tl{border-left:3px solid #0b3d5c;margin-left:6px;padding-left:10px}.tl div{margin-bottom:5px}
+.log{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;background:#0f1720;color:#d0d7de;padding:8px;height:66vh;overflow:auto}
+.log .e{color:#ff8a80}.log .w{color:#ffd180}
+.group{border:1px solid #e4e7eb;border-radius:6px;padding:6px 8px;margin-bottom:8px}.scen{padding:4px 0;border-bottom:1px dashed #e4e7eb}.scen.active{background:#f0fdf4}
+</style></head><body>
+<div id="side"><h1>SWIFT 模拟器<br><span class="small" style="opacity:.75">管理端</span></h1>
+<a href="#dash">概览</a><a href="#msgs">报文</a><a href="#ledger">业务台账</a><a href="#review">审批队列 <span id="rvc"></span></a><a href="#parts">机构</a>
+<a href="#scen">模拟场景</a><a href="#compose">发报 / 校验</a><a href="#logs">运行日志</a><a href="#audit">审计日志</a><a href="#tools">管理工具</a>
+<div class="foot"><span id="who"></span> · <a href="#" onclick="logout();return false" style="display:inline;padding:0;color:#fff">退出</a></div></div>
+<div id="main"></div><div id="toast"></div>
+<script src="app.js"></script>
+</body></html>

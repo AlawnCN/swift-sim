@@ -1,0 +1,5 @@
+# MT430 Amendment: remitting bank asks the collecting bank to return the documents (/RETURN/ in 74)
+:20:${ref}
+:21:${coll_collectingRef|'NONREF'}
+:74:/RETURN/PLEASE RETURN ALL
+DOCUMENTS UNPAID

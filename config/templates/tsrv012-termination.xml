@@ -1,0 +1,15 @@
+<!-- tsrv.012 UndertakingTerminationNotification (kickoff from ISSUING_BANK) -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.012.001.01">
+  <UdrtkgTermntnNtfctn>
+    <UdrtkgTermntnNtfctnDtls>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+      <TermntnDtls>
+        <FctvDt>${todayIso}</FctvDt>
+        <AddtlInf>UNDERTAKING RELEASED - SIMULATED</AddtlInf>
+      </TermntnDtls>
+    </UdrtkgTermntnNtfctnDtls>
+  </UdrtkgTermntnNtfctn>
+</Document>

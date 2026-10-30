@@ -1,0 +1,1073 @@
+{
+ "openapi": "3.0.3",
+ "info": {
+  "title": "swift-sim AI API",
+  "version": "1.0",
+  "description": "AI / automation access to the SWIFT trade-finance simulator (guarantees, documentary credits, collections). Bind: 127.0.0.1:8082. Auth: Authorization: Bearer <key> (config/secrets/ai-api-keys). read scope = GET + validate + preview + MCP read tools; operator scope = also trigger / respond."
+ },
+ "servers": [
+  {
+   "url": "http://127.0.0.1:8082"
+  }
+ ],
+ "security": [
+  {
+   "bearer": []
+  }
+ ],
+ "components": {
+  "securitySchemes": {
+   "bearer": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  },
+  "responses": {
+   "Unauthorized": {
+    "description": "missing or invalid key"
+   }
+  }
+ },
+ "paths": {
+  "/ai/v1": {
+   "get": {
+    "summary": "Index: endpoints, key name and scope",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/whoami": {
+   "get": {
+    "summary": "Key name and scope",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/messages": {
+   "get": {
+    "summary": "Search / poll messages",
+    "description": "Without sinceId: newest first. With sinceId: oldest first after the cursor; response has cursor (last id) and hasMore.",
+    "parameters": [
+     {
+      "name": "sinceId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "cursor: only id > sinceId, ascending (incremental polling)"
+     },
+     {
+      "name": "beforeId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "paging backwards (descending mode)"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "max 500, default 100"
+     },
+     {
+      "name": "ref",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "substring of field 20 / 21 / business reference"
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "message type, e.g. MT760, 767, tsrv.001"
+     },
+     {
+      "name": "bank",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "BIC or participant id; matches sender or receiver"
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "sender BIC/id"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "receiver BIC/id"
+     },
+     {
+      "name": "direction",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "IN (from your system), OUT (to your system), INTERNAL, SYS; comma list"
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "MT|MX|SYS"
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "gateway status ACK|NAK|DELIVERED (comma list)"
+     },
+     {
+      "name": "business",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "APPLIED|REJECTED|INCONSISTENT|PENDING_REVIEW|DUPLICATE_IGNORED or BIZREJECT"
+     },
+     {
+      "name": "dateFrom",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "YYYY-MM-DD or ISO date-time"
+     },
+     {
+      "name": "dateTo",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "YYYY-MM-DD (inclusive) or ISO date-time"
+     },
+     {
+      "name": "includeSys",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean"
+      },
+      "description": "include ACK/NAK/DLV/NOTE service messages"
+     },
+     {
+      "name": "includeRaw",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean"
+      },
+      "description": "include raw text"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/messages/{id}": {
+   "get": {
+    "summary": "One message: raw, parsed fields, validation findings, linked business, replies",
+    "description": "",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer"
+      },
+      "description": ""
+     },
+     {
+      "name": "includeRaw",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean"
+      },
+      "description": "default true"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/business": {
+   "get": {
+    "summary": "List business records",
+    "description": "",
+    "parameters": [
+     {
+      "name": "family",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "UNDERTAKING|LC|COLL"
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "party",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "BIC or participant id"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/business/{ref}": {
+   "get": {
+    "summary": "Business record: state, amounts, parties, items, movements, history, messages, expectedNext",
+    "description": "",
+    "parameters": [
+     {
+      "name": "ref",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "includeRaw",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/business/{ref}/reconcile": {
+   "get": {
+    "summary": "Reconcile a flow: summary + findings (severity, code, message, evidence)",
+    "description": "",
+    "parameters": [
+     {
+      "name": "ref",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/validate": {
+   "post": {
+    "summary": "Validate a message without sending (syntax + network + business dry run)",
+    "description": "verdict: OK | WOULD_NAK | WOULD_BUSINESS_REJECT | BUSINESS_INCONSISTENT. Allowed for read scope.",
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "mtType",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "bad request"
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "raw"
+        ],
+        "properties": {
+         "raw": {
+          "type": "string"
+         },
+         "from": {
+          "type": "string"
+         },
+         "to": {
+          "type": "string"
+         },
+         "mtType": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "text/plain": {
+       "schema": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/ai/v1/scenarios": {
+   "get": {
+    "summary": "Scenarios and active scenario per group",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/scenarios/{id}/trigger": {
+   "post": {
+    "summary": "Kick off a scenario (operator scope)",
+    "description": "",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "MT|MX"
+     },
+     {
+      "name": "ref",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "bad request"
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "403": {
+      "description": "key has read scope (code AI-SCOPE)"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "additionalProperties": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/ai/v1/review-queue": {
+   "get": {
+    "summary": "Review queue items",
+    "description": "",
+    "parameters": [
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "PENDING_REVIEW (default) | RESPONDED | DISMISSED | ALL"
+     },
+     {
+      "name": "participant",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/review-queue/{id}": {
+   "get": {
+    "summary": "Review item with message, ledger context and allowed actions",
+    "description": "",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/review-queue/{id}/preview": {
+   "post": {
+    "summary": "Draft of the message(s) a decision would send (nothing sent; allowed for read scope)",
+    "description": "",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "bad request"
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "action"
+        ],
+        "properties": {
+         "action": {
+          "type": "string",
+          "enum": [
+           "ACK",
+           "ACCEPT",
+           "REFUSE",
+           "PAY",
+           "EXTEND",
+           "CONFIRM",
+           "BUSINESS_REJECT",
+           "SCENARIO",
+           "CUSTOM",
+           "DISMISS"
+          ]
+         },
+         "reasons": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "amount": {
+          "type": "string"
+         },
+         "newExpiry": {
+          "type": "string",
+          "format": "date"
+         },
+         "scenario": {
+          "type": "string"
+         },
+         "raw": {
+          "type": "string"
+         },
+         "mtType": {
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/ai/v1/review-queue/{id}/respond": {
+   "post": {
+    "summary": "Decide a review item (virtual bank sends the response) (operator scope)",
+    "description": "",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer"
+      },
+      "description": ""
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "bad request"
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "403": {
+      "description": "key has read scope (code AI-SCOPE)"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "action"
+        ],
+        "properties": {
+         "action": {
+          "type": "string",
+          "enum": [
+           "ACK",
+           "ACCEPT",
+           "REFUSE",
+           "PAY",
+           "EXTEND",
+           "CONFIRM",
+           "BUSINESS_REJECT",
+           "SCENARIO",
+           "CUSTOM",
+           "DISMISS"
+          ]
+         },
+         "reasons": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "amount": {
+          "type": "string"
+         },
+         "newExpiry": {
+          "type": "string",
+          "format": "date"
+         },
+         "scenario": {
+          "type": "string"
+         },
+         "raw": {
+          "type": "string"
+         },
+         "mtType": {
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/ai/v1/reference/rule-codes": {
+   "get": {
+    "summary": "Catalogue of SIM-* (network/syntax) and BIZ-* (business) rule codes",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/reference/state-machines": {
+   "get": {
+    "summary": "Statuses, transitions, expected next messages and invariants per product",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/reference/message-types": {
+   "get": {
+    "summary": "Supported MT / MX message types per product",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/reference/participants": {
+   "get": {
+    "summary": "Participants (id, BIC, role, SUT flag, review mode)",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/sessions": {
+   "get": {
+    "summary": "FIN-like LT sessions: session number, last ISN / OSN per BIC",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/pending-responses": {
+   "get": {
+    "summary": "Simulator responses scheduled but not yet sent",
+    "description": "",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     },
+     "404": {
+      "description": "not found"
+     }
+    }
+   }
+  },
+  "/ai/v1/mcp": {
+   "post": {
+    "summary": "MCP (Model Context Protocol) JSON-RPC 2.0 endpoint: initialize, tools/list, tools/call, ping",
+    "description": "Streamable HTTP transport, JSON responses, stateless. Operator-only tools (respond_review, trigger_scenario) return isError for read keys.",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "bad request"
+     },
+     "401": {
+      "$ref": "#/components/responses/Unauthorized"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

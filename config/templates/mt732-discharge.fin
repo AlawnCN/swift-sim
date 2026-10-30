@@ -1,0 +1,6 @@
+# MT732 Advice of discharge (virtual issuing bank -> SUT presenter): documents taken up despite discrepancies
+:20:${newRef}
+:21:${f20|lc_presRef}
+:30:${today6}
+:32B:${currency}${lc_presAmount|amount}
+:72Z:APPLICANT WAIVED THE DISCREPANCIES

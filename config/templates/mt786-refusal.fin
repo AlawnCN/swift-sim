@@ -1,0 +1,7 @@
+# MT786 Demand refusal advice; 77J = reason(s) for refusal / discrepancies (50z lines)
+:20:${ref}
+:21:${f21|demandId}
+:52A:${issuerBic}
+:30:${today6}
+:32B:${currency}${amount}
+:77J:${reason}

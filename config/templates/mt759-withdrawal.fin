@@ -1,0 +1,11 @@
+# MT759 demand withdrawal (simulator convention - no dedicated MT since SR2021; MX = tsrv.017):
+# 23H OTHERFNC, 45D contains WITHDRAW, :21: = demand reference (= :21: of the MT765), :23: = undertaking number
+:27:1/1
+:20:${newRef}
+:21:${ldg_pendingDemandId|demandId}
+:22D:${ldg_form|'DGAR'}
+:23:${ref}
+:23H:OTHERFNC
+:45D:WITHDRAWAL OF DEMAND ${ldg_pendingDemandId|demandId}
+UNDER UNDERTAKING ${ref}.
+THE BENEFICIARY WITHDRAWS ITS DEMAND.

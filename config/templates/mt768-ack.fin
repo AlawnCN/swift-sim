@@ -1,0 +1,7 @@
+# MT768 Acknowledgement of a Guarantee / Standby message (block 4 only; headers added by the engine)
+# 21 = reference (undertaking number) of the acknowledged message
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:72Z:SIMULATED ACKNOWLEDGEMENT OF
+${inboundType|'MESSAGE'} FROM ${sender|'SENDER'}

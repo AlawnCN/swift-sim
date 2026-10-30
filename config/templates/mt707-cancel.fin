@@ -1,0 +1,13 @@
+# MT707 Cancellation request (23S CANCEL) - effective only after the beneficiary's acceptance (MT730 /BENACC/)
+:27:1/1
+:20:${ref}
+:21:NONREF
+:23:${ref}
+:52A:${issuerBic}
+:31C:${lc_issueDate6|today6}
+:26E:${nextAmendmentNo|'1'}
+:30:${today6}
+:22A:ISSU
+:23S:CANCEL
+:72Z:PLEASE OBTAIN THE BENEFICIARY'S
+CONSENT TO THE CANCELLATION

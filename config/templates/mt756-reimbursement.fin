@@ -1,0 +1,6 @@
+# MT756 Advice of reimbursement or payment (issuing bank -> presenter). 21 = presenting bank's reference
+:20:${newRef}
+:21:${f20|lc_presRef}
+:32B:${currency}${lc_presAmount|amount}
+:33A:${today6}${currency}${lc_presAmount|amount}
+:72Z:WE HAVE COVERED YOU VIA MT202

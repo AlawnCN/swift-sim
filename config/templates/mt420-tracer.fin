@@ -1,0 +1,5 @@
+# MT420 Tracer (remitting bank -> collecting bank). 20 = remitting bank's collection reference, 21 = collecting bank's reference or NONREF
+:20:${ref}
+:21:${coll_collectingRef|'NONREF'}
+:32B:${currency}${outstanding|amount}
+:72:/TRACE/PLEASE ADVISE FATE

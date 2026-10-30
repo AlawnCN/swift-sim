@@ -1,0 +1,6 @@
+# MT499 used by a virtual bank to reject a collection message at BUSINESS level (simulator convention; Cat 4 has no reject MT).
+:20:${newRef}
+:21:${f20|ref|'NONREF'}
+:79:BUSINESS REJECTION OF YOUR ${inboundType|'MESSAGE'}
+REFERENCE ${f20|ref|'NONREF'} - NOT PROCESSED
+${!rejectReasons}

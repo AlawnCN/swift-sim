@@ -1,0 +1,9 @@
+# MT759 query from a counterparty bank to the SUT (opens a query in the ledger until the SUT answers with MT759 :21: = this :20:)
+:27:1/1
+:20:${newRef}
+:21:NONREF
+:22D:${ldg_form|'DGAR'}
+:23:${ref}
+:23H:OTHERFNC
+:45D:QUERY - PLEASE CONFIRM THE CURRENT STATUS AND THE
+OUTSTANDING AMOUNT OF UNDERTAKING ${ref}

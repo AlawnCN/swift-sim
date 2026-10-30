@@ -1,0 +1,9 @@
+# MT785 Guarantee / standby non-extension notification (kickoff from ISSUING_BANK)
+# TODO verify meaning of 31C (date of issue?) and 31E (final expiry date) in MT785 against SWIFT UHB
+:20:${ref}
+:52A:${issuerBic}
+:31C:${today6}
+:59A:${bic_BENEFICIARY_BANK}
+:31E:${ldg_expiry6|expiry6}
+:72Z:WE HEREBY NOTIFY THAT THE
+UNDERTAKING WILL NOT BE EXTENDED

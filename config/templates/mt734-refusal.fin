@@ -1,0 +1,6 @@
+# MT734 Advice of refusal (issuing / confirming bank -> presenter). 77B: /HOLD/, /NOTIFY/, /PREVINST/, /RETURN/
+:20:${newRef}
+:21:${f20|lc_presRef}
+:32A:${today6}${currency}${lc_presAmount|amount}
+:77J:${reason|'+LATE SHIPMENT - BILL OF LADING DATED AFTER 44C'}
+:77B:${disposal|'/HOLD/'}

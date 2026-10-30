@@ -1,0 +1,8 @@
+# MT769 Advice of reduction or release - reduction following payment
+# SR2021+ (Prowide SRU2025 labels): 33B = amount reduced or released, 34B = amount outstanding, 32B/D = amount of charges
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:33B:${currency}${amount}
+:72Z:REDUCTION FOLLOWING PAYMENT OF
+DEMAND ${f21|demandId}

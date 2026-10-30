@@ -1,0 +1,7 @@
+# MT730 Acknowledgement. 72Z first line ${ackLine}: /BENACC/ or /BENREJ/<reason> (beneficiary accepts / rejects the
+# pending amendment - SR2018+ usage), /CONFIRMED/ (simulator convention: confirmation added), or plain acknowledgement
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:72Z:${ackLine|'/ACK/'}
+${narrative|'ADVISED TO THE BENEFICIARY'}

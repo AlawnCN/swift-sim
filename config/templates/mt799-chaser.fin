@@ -1,0 +1,6 @@
+# MT799 Chaser (presenter asks for payment / fate of documents still unpaid). Sent only if the presentation is still open.
+:20:${newRef}
+:21:${lc_presRef|ref}
+:79:CHASER - DOCUMENTS PRESENTED UNDER
+CREDIT ${ref} REMAIN UNPAID.
+PLEASE ADVISE PAYMENT OR REFUSAL.

@@ -1,0 +1,6 @@
+# MT422 Advice of fate and request for instructions (collecting bank -> remitting bank). /RETURNED/ in 76 = documents returned
+:20:${newRef}
+:21:${ref}
+:32B:${currency}${outstanding|amount}
+:76:${fate|'DOCUMENTS PRESENTED
+DRAWEE PROMISES PAYMENT'}

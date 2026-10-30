@@ -1,0 +1,76 @@
+# Virtual SWIFT participants. ALL BICs below are FICTIONAL test identifiers
+# (bank code "TST*", location code with '0' or digits as 2nd char = SWIFT test & training style).
+# Do not use real BICs here.
+gateway:
+  deliveryDelayMs: 800          # ACK -> delivery delay
+  defaultMxSender: TSTAKEN0XXX  # used for MX without AppHdr and without ?from=
+  defaultMxReceiver: TSTCKEN0XXX
+  maxDepth: 5
+  enforceIsn: false             # true = NAK when block 1 carries a non-zero ISN that is not the expected next one
+  requireAppHdr: false          # true = NAK MX without Business Application Header
+  testAndTrainingTrailer: true  # add {TNG:} to delivered MT (approximation)
+  fieldFormatValidation: true   # field format/length/charset check from Prowide validatorPattern
+
+# Business (receiver application) behaviour of the virtual banks - see README section "交易台账与状态机"
+ledger:
+  allowConcurrentAmendments: false   # false = 2nd amendment while one is pending -> business reject BIZ-A01
+  allowConcurrentDemands: false      # false = 2nd demand while one is under examination -> BIZ-D03
+  rejectUnknownReferences: true      # message for an unknown undertaking number -> BIZ-U01
+  preIssuanceMt759Codes: [REQISSUE]  # MT759 23H codes allowed before an undertaking exists (TODO verify code list)
+  rejectDelaySeconds: 1
+
+participants:
+  - id: SUT_BANK
+    name: Your System Kenya Test Bank (SUT)
+    bic: TSTAKEN0XXX
+    role: SUT - your trade finance system (issuer / advising / beneficiary bank depending on scenario)
+    sut: true
+    webhookUrl: ""              # e.g. http://localhost:9090/swift/callback (optional)
+    deliveryNotifications: true
+
+  - id: ISSUING_BANK
+    name: Virtual Issuing Bank London
+    bic: TSTBGB20XXX
+    role: Issuing bank (guarantor) - virtual
+    reviewMode: false           # true = inbound messages queue at /api/review-queue instead of auto-answer (runtime: POST /api/participants/{id}/review-mode)
+
+  - id: ADVISING_BANK
+    name: Virtual Advising Bank Nairobi
+    bic: TSTCKEN0XXX
+    role: Advising bank - virtual
+
+  - id: BENEFICIARY_BANK
+    name: Virtual Beneficiary Bank Mombasa
+    bic: TSTDKEN0XXX
+    role: Beneficiary's bank / presenter - virtual
+
+  - id: APPLICANT_BANK
+    name: Virtual Applicant Bank Shanghai
+    bic: TSTECN20XXX
+    role: Applicant's (instructing / counter-guarantee) bank - virtual
+
+  # ---- added for documentary credits (Cat 7) and collections (Cat 4); fictional test BICs
+  - id: REIMBURSING_BANK
+    name: Virtual Reimbursing Bank New York
+    bic: TSTFUS30XXX
+    role: Reimbursing bank (MT740 / MT742 / MT747 / MT744 / MT202) - virtual
+
+  - id: CONFIRMING_BANK
+    name: Virtual Confirming Bank Nairobi
+    bic: TSTGKEN0XXX
+    role: Confirming / nominated bank of documentary credits - virtual
+
+  - id: COLLECTING_BANK
+    name: Virtual Collecting Bank Shanghai
+    bic: TSTHCN20XXX
+    role: Collecting / presenting bank of collections (SUT = remitting bank) - virtual
+
+  - id: REMITTING_BANK
+    name: Virtual Remitting Bank Mumbai
+    bic: TSTJIN20XXX
+    role: Remitting bank of collections (SUT = collecting bank) - virtual
+
+  - id: TRANSFEREE_BANK
+    name: Virtual Second Beneficiary Bank Dubai
+    bic: TSTKAE20XXX
+    role: Advising bank of the second beneficiary of transferred credits (MT720) - virtual

@@ -1,0 +1,8 @@
+# MT456 Advice of dishonour (collecting bank -> remitting bank): 33D amount debited
+:20:${newRef}
+:21:${ref}
+:32B:${currency}${coll_paid|amount}
+:33D:${today6}${currency}${coll_paid|amount}
+:77A:ITEM RETURNED UNPAID
+INSUFFICIENT FUNDS
+:77D:CHARGES FOR YOUR ACCOUNT

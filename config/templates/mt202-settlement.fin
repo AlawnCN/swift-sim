@@ -1,0 +1,5 @@
+# MT202 simulated settlement of a paid demand (Category 2; outside phase-1 scope, illustrative only)
+:20:${newRef}
+:21:${ref}
+:32A:${today6}${currency}${amount}
+:58A:${toBic}

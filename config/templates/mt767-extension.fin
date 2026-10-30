@@ -1,0 +1,13 @@
+# MT767 amendment extending expiry (issuer's answer to an extend-or-pay demand)
+# TODO verify 22A purpose code for an issuer's amendment (simulator uses ISUA) against SWIFT UHB
+:15A:
+:27:1/1
+:21:${f21|newRef}
+:22A:ISUA
+:15B:
+:20:${ref}
+:26E:${nextAmendmentNo|amendmentNo|'1'}
+:30:${today6}
+:52A:${issuerBic}
+:23B:FIXD
+:31E:${newExpiry6}

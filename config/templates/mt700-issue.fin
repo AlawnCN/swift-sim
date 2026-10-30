@@ -1,0 +1,35 @@
+# MT700 Issue of a documentary credit (virtual issuing bank -> SUT as advising / confirming / nominated bank)
+# step vars: reimbLine (e.g. :53A:<BIC> reimbursing bank), lcForm (40A), tolerance (39A nn/nn), availWith + availBy (41D 2 lines), partial (43P), confirm (49), extra (raw extra fields)
+:27:1/1
+:40A:${lcForm|'IRREVOCABLE'}
+:20:${ref}
+:31C:${today6}
+:40E:UCP LATEST VERSION
+:31D:${expiry6}${lcPlace|'NAIROBI'}
+:50:EXAMPLE IMPORTS PLC (FICTIONAL)
+LONDON UNITED KINGDOM
+:59:KENYA EXPORTS LTD (FICTIONAL)
+NAIROBI KENYA
+:32B:${currency}${amount}
+:39A:${tolerance|'05/05'}
+:41D:${availWith|'ANY BANK'}
+${availBy|'BY NEGOTIATION'}
+:43P:${partial|'ALLOWED'}
+:43T:ALLOWED
+:44E:FELIXSTOWE UNITED KINGDOM
+:44F:MOMBASA KENYA
+:44C:${ship6}
+:45A:+1000 UNITS TEST MACHINERY PARTS (FICTIONAL)
+CIF MOMBASA INCOTERMS 2020
+:46A:+SIGNED COMMERCIAL INVOICE IN 3 COPIES
++FULL SET CLEAN ON BOARD BILLS OF LADING
++PACKING LIST
+:47A:+ALL DOCUMENTS MUST INDICATE THE CREDIT NUMBER
+:71D:ALL CHARGES OUTSIDE ISSUING BANK
+ARE FOR BENEFICIARY ACCOUNT
+:48:21
+:49:${confirm|'WITHOUT'}
+${!reimbLine|''}
+:78:ON RECEIPT OF COMPLYING DOCUMENTS WE SHALL REIMBURSE YOU
+AS PER YOUR INSTRUCTIONS. SIMULATED TEST MESSAGE - NO VALUE.
+${!extra|''}

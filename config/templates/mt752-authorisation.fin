@@ -1,0 +1,7 @@
+# MT752 Authorisation to pay, accept or negotiate (issuing bank -> presenter). 23: ACCEPT, DEBIT, NEGOTIATE, REIMBURSE, REMITTED, SEE79Z
+:20:${ref}
+:21:${f20|lc_presRef}
+:23:${authCode|'REMITTED'}
+:30:${today6}
+:32B:${currency}${lc_presAmount|amount}
+:33A:${today6}${currency}${lc_presAmount|amount}

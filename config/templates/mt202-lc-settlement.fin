@@ -1,0 +1,6 @@
+# MT202 Cover / settlement for a documentary credit presentation or reimbursement claim. 21 = presentation / claim reference
+:20:${newRef}
+:21:${f20|lc_presRef|ref}
+:32A:${today6}${currency}${lc_presAmount|amount}
+:58A:${toBic}
+:72:/BNF/LC ${ref}

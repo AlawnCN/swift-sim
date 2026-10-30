@@ -1,0 +1,12 @@
+<!-- tsrv.011 UndertakingNonExtensionNotification (kickoff from ISSUING_BANK) -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.011.001.01">
+  <UdrtkgNonXtnsnNtfctn>
+    <UdrtkgNonXtnsnNtfctnDtls>
+      <NtifngPty><Nm>${fromName}</Nm><Id><OrgId><AnyBIC>${fromBic}</AnyBIC></OrgId></Id></NtifngPty>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+    </UdrtkgNonXtnsnNtfctnDtls>
+  </UdrtkgNonXtnsnNtfctn>
+</Document>

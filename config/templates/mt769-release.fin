@@ -1,0 +1,7 @@
+# MT769 Advice of reduction or release - full release (kickoff from ISSUING_BANK)
+:20:${newRef}
+:21:${ref}
+:30:${today6}
+:33B:${currency}${amount}
+:34B:${currency}0,00
+:72Z:UNDERTAKING RELEASED IN FULL

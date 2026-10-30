@@ -1,0 +1,15 @@
+<!-- tsrv.013 UndertakingDemand (kickoff from BENEFICIARY_BANK). Tp PAYM | PAEX; ${!mxExtra} may add ReqdXpryDt -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.013.001.01">
+  <UdrtkgDmnd>
+    <UdrtkgDmndDtls>
+      <Id>${demandId}</Id>
+      <Tp>${demandType|'PAYM'}</Tp>
+      <UdrtkgId>
+        <Id>${ref}</Id>
+        <Issr><Id><OrgId><AnyBIC>${issuerBic}</AnyBIC></OrgId></Id></Issr>
+      </UdrtkgId>
+      <DmndAmt><Amt Ccy="${currency}">${amountIso}</Amt></DmndAmt>
+      ${!mxExtra|''}
+    </UdrtkgDmndDtls>
+  </UdrtkgDmnd>
+</Document>

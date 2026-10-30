@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:tsrv.001.001.01">
+  <UdrtkgIssnc>
+    <UdrtkgIssncDtls>
+      <Id>KEGTEEBAD0001</Id>
+      <Nm>DGAR</Nm>
+      <IssncTp>ISSU</IssncTp>
+      <Issr><Nm>Your System Kenya Test Bank</Nm><Id><OrgId><AnyBIC>TSTAKEN0XXX</AnyBIC></OrgId></Id></Issr>
+      <Bnfcry><Nm>X</Nm></Bnfcry>
+      <DtOfIssnc>2026-10-29</DtOfIssnc>
+    </UdrtkgIssncDtls>
+  </UdrtkgIssnc>
+</Document>

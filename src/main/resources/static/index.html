@@ -7,7 +7,7 @@
  body{font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;background:#f4f6f8;color:#222;font-size:13px}
  header{background:#0b3d5c;color:#fff;padding:10px 16px}
  header h1{font-size:17px;margin:0} header small{opacity:.8}
- main{display:grid;grid-template-columns:1fr 430px;gap:12px;padding:12px}
+ main{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:12px;padding:12px}
  section{background:#fff;border-radius:6px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
  h2{font-size:14px;margin:0 0 8px}
  table{border-collapse:collapse;width:100%} th,td{border-bottom:1px solid #e3e6ea;padding:4px 6px;text-align:left;vertical-align:top}
@@ -26,6 +26,43 @@
  .tl{border-left:3px solid #0b3d5c;margin-left:6px;padding-left:10px} .tl div{margin-bottom:6px}
  .tl .ev-BUSINESS_REJECTED,.tl .ev-INCONSISTENT_MESSAGE{color:#c00} .badge{display:inline-block;padding:1px 6px;border-radius:8px;background:#e3eef8;margin-right:4px}
  .kv td:first-child{color:#666;white-space:nowrap}
+ /* ---- layout: page = header + nav + view filling the rest of the viewport; on the 报文 tab the right column scrolls on its own */
+ html,body{height:100%} body{display:flex;flex-direction:column}
+ body>header,body>nav{flex:none}
+ main.view.on{flex:1;min-height:0;overflow:auto;align-content:start}
+ #v-log.on{overflow:hidden;grid-template-rows:minmax(0,1fr);align-content:stretch}
+ #v-log>.left{min-height:0;overflow-y:auto}
+ #v-log>.side{min-height:0;display:flex;flex-direction:column;gap:10px}
+ .side>section{display:flex;flex-direction:column;min-height:0}
+ .scenPane{flex:1 1 auto;min-height:150px}
+ .scenList{flex:1;min-height:0;overflow-y:auto;padding-right:2px}
+ .sendPane{flex:none;max-height:55%;overflow-y:auto;border-top:3px solid #0b3d5c}
+ .sendPane textarea{height:auto;min-height:60px;resize:vertical}
+ .sendPane .row{margin-bottom:4px} .sendPane select{max-width:165px}
+ .sendPane pre{max-height:110px;margin:6px 0 0} .sendPane pre:empty{display:none}
+ .sendPane.collapsed .sbody{display:none}
+ .phead{display:flex;align-items:center;gap:6px;margin:0;cursor:pointer;user-select:none}
+ .phead .car,.ghead .car{display:inline-block;width:12px;color:#0b3d5c;transition:transform .15s}
+ .sendPane:not(.collapsed) .phead .car,.gcard.open .ghead .car{transform:rotate(90deg)}
+ .phead #sSum{margin-left:auto;font-weight:normal;color:#666;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .sendPane:not(.collapsed) .phead{margin-bottom:8px}
+ .tools{display:flex;gap:6px;align-items:center;margin-bottom:6px} .tools input{flex:1;min-width:80px}
+ .tools a{color:#06c;cursor:pointer;white-space:nowrap} .tools small{color:#888;white-space:nowrap}
+ .dom{font-weight:bold;color:#0b3d5c;margin:10px 2px 4px;font-size:12px;border-bottom:1px solid #d5dde5;padding-bottom:2px}
+ .dom:first-child{margin-top:0}
+ .gcard{border:1px solid #d5dde5;border-radius:6px;margin-bottom:6px;background:#fff;overflow:hidden}
+ .gcard.has-active{border-left:3px solid #0a6}
+ .ghead{display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;background:#f7f9fb;user-select:none}
+ .ghead:hover{background:#eef6ff}
+ .ghead .gid{color:#888} .ghead .cnt{background:#e3eef8;border-radius:8px;padding:0 6px;font-size:11px}
+ .ghead .actm{margin-left:auto;color:#0a6;font-size:11px;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .gbody{display:none;padding:6px 6px 0} .gcard.open .gbody{display:block}
+ @media (max-width:900px){
+  main{grid-template-columns:minmax(0,1fr)}
+  #v-log.on{overflow:auto;grid-template-rows:none;align-content:start}
+  #v-log>.left{overflow:visible} #v-log>.side{display:block}
+  .side>section{display:block;margin-top:12px} .scenList{max-height:60vh} .sendPane{max-height:none}
+ }
 </style>
 </head>
 <body>
@@ -35,7 +72,7 @@
 <button id="tab-rv" onclick="tab('rv')">人工 / AI 审核队列 <span id="rvCount"></span></button>
 <span style="margin-left:auto">营业日 <input id="bizDate" type="date"> <button class="sec" onclick="setBiz()">设置</button> <button class="sec" onclick="resetBiz()">恢复今天</button></span></nav>
 <main id="v-log" class="view on">
-<div>
+<div class="left">
  <section>
   <h2>报文日志</h2>
   <div class="row">
@@ -56,23 +93,27 @@
   <pre id="detRaw">点击上方一行查看原文</pre>
  </section>
 </div>
-<div>
- <section>
+<div class="side">
+ <section class="scenPane">
   <h2>场景 (同组内只有一个处于激活状态)</h2>
   <div class="row">触发报文格式 <select id="trigFmt"><option>MT</option><option>MX</option></select>
    交易号(可选) <input id="trigRef" size="16"></div>
-  <div id="scen"></div>
+  <div class="tools"><input id="scenQ" placeholder="搜索场景 (名称 / ID / 报文类型)" oninput="renderScen()">
+   <a onclick="openAll(true)">全部展开</a> <a onclick="openAll(false)">全部收起</a> <small id="scenCnt"></small></div>
+  <div id="scen" class="scenList"></div>
  </section>
- <section style="margin-top:12px">
-  <h2>以某虚拟行/本系统身份发送报文</h2>
-  <div class="row">样例 <select id="sample" onchange="loadSample()"><option value="">-- 选择样例 --</option></select></div>
+ <section class="sendPane" id="sendPane">
+  <h2 class="phead" onclick="toggleSend()" title="点击收起 / 展开"><span class="car">▸</span>以某虚拟行/本系统身份发送报文 <small id="sSum"></small></h2>
+  <div class="sbody">
+  <div class="row">样例 <select id="sample" style="max-width:300px" onchange="loadSample()"><option value="">-- 选择样例 --</option></select></div>
   <div class="row">From <select id="sFrom"><option value="">(取自报文头)</option></select>
    To <select id="sTo"><option value="">(取自报文头)</option></select></div>
   <div class="row">MT 类型(仅裸 block4 时) <input id="sMt" size="4" placeholder="760">
    强制场景 <select id="sScen"><option value="">(使用激活场景)</option></select></div>
-  <textarea id="sBody" placeholder="粘贴 MT (FIN) 或 MX (XML) 报文"></textarea>
-  <div class="row"><button onclick="send()">发送</button></div>
+  <textarea id="sBody" rows="7" placeholder="粘贴 MT (FIN) 或 MX (XML) 报文"></textarea>
+  <div class="row" style="margin:6px 0 0"><button onclick="send()">发送</button></div>
   <pre id="sResult"></pre>
+  </div>
  </section>
 </div>
 </main>
@@ -120,19 +161,63 @@ async function show(id){
   (m.statusReason?`<div class="st-NAK">原因: <pre>${esc(m.statusReason)}</pre></div>`:'')+(m.warnings?`<div>警告: <pre>${esc(m.warnings)}</pre></div>`:'');
  $('detRaw').textContent=m.raw+(m.deliveredRaw&&m.deliveredRaw!==m.raw?'\n\n---- 投递给收报行的格式 (output / 带 trailer) ----\n'+m.deliveredRaw:'');
 }
-async function loadScen(){
- const d=await j('/api/scenarios');
- $('scen').innerHTML=d.scenarios.map(s=>`<div class="scen ${s.active?'active':''}"><b>${esc(s.name)}</b> <small>[${esc(s.id)}${s.group?' / 组 '+esc(s.group):''}]</small>
+// ---- scenario group cards (expand/collapse state persisted in localStorage)
+const GROUP_LABEL={issuance:'开立',amendment:'修改',demand:'索赔','extend-or-pay':'延期或付款','non-extension':'不续期','release':'释放 / 终止',
+ 'issuer-followup':'开证行跟进','lc-advice':'信用证通知','lc-amendment':'信用证修改','lc-reimbursement':'偿付行','lc-issuer':'开证行(交单回复)',
+ 'coll-remit':'托收(代收行回复)','coll-tracer':'托收查询','coll-amend':'托收修改','coll-remitter':'委托行'};
+const DOMAINS=[['bg','保函 / 备用信用证'],['lc','跟单信用证'],['coll','托收'],['gen','通用 / 兜底']];
+let scenData={scenarios:[]},scenOpen=null;
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function domOf(s){if(s.fallback)return 'gen';const k=s.group||s.id;return k.startsWith('lc-')?'lc':k.startsWith('coll-')?'coll':'bg'}
+function gkey(s){return s.fallback?'_fallback':s.group?s.group:'_solo:'+domOf(s)}
+function glabel(k){if(k==='_fallback')return '兜底场景 (fallback)';if(k.startsWith('_solo:'))return '主动触发 (无组, 可直接触发)';return GROUP_LABEL[k]||k}
+function scenCard(s){return `<div class="scen ${s.active?'active':''}"><b>${esc(s.name)}</b> <small>[${esc(s.id)}${s.group?' / 组 '+esc(s.group):''}]</small>
   <div><small>${esc(s.description)}</small></div><div class="row" style="margin:4px 0 0">
   ${s.group&&!s.active?`<button onclick="act('${s.id}')">激活</button>`:''}
   ${s.hasKickoff?`<button onclick="trig('${s.id}')">触发 (虚拟行先发报)</button>`:''}
-  <small>响应: ${esc(s.reactsTo.join(', '))}</small></div></div>`).join('');
- $('sScen').innerHTML='<option value="">(使用激活场景)</option>'+d.scenarios.map(s=>`<option>${s.id}</option>`).join('');
+  <small>响应: ${esc(s.reactsTo.join(', '))}</small></div></div>`}
+function renderScen(){
+ const all=scenData.scenarios||[],q=($('scenQ').value||'').trim().toLowerCase();
+ const match=s=>!q||[s.id,s.name,s.description,s.group,(s.reactsTo||[]).join(' ')].join(' ').toLowerCase().includes(q);
+ const groups=new Map();
+ all.forEach(s=>{const k=gkey(s);if(!groups.has(k))groups.set(k,{key:k,dom:domOf(s),items:[]});groups.get(k).items.push(s)});
+ if(scenOpen==null){const last=lsGet('swiftsim.scen.lastAct',null),ls=all.find(s=>s.id===last);
+  const first=all.find(s=>s.group&&s.active);scenOpen=new Set([ls?gkey(ls):first?gkey(first):'issuance']);}
+ let html='',shown=0;
+ DOMAINS.forEach(([d,dl])=>{
+  const gs=[...groups.values()].filter(g=>g.dom===d).sort((a,b)=>(a.key.startsWith('_')?1:0)-(b.key.startsWith('_')?1:0));
+  let part='';
+  gs.forEach(g=>{const its=g.items.filter(match);if(!its.length)return;shown+=its.length;
+   const act=g.items.find(s=>s.active&&s.group),open=q?true:scenOpen.has(g.key);
+   part+=`<div class="gcard ${act?'has-active':''} ${open?'open':''}"><div class="ghead" data-k="${esc(g.key)}"><span class="car">▸</span><b>${esc(glabel(g.key))}</b>
+    ${g.key.startsWith('_')?'':`<small class="gid">${esc(g.key)}</small>`}<span class="cnt">${q?its.length+'/':''}${g.items.length}</span>
+    ${act?`<span class="actm" title="${esc(act.name)}">● 激活: ${esc(act.name)}</span>`:''}</div>
+    <div class="gbody">${open?its.map(scenCard).join(''):''}</div></div>`});
+  if(part)html+=`<div class="dom">${dl}</div>`+part});
+ const sc=$('scen'),top=sc.scrollTop;sc.innerHTML=html||'<small>无匹配场景</small>';sc.scrollTop=top;
+ $('scenCnt').textContent=q?shown+'/'+all.length:all.length+' 个场景';
 }
-async function act(id){await j('/api/scenarios/'+id+'/activate',{method:'POST'});loadScen()}
+$('scen').addEventListener('click',e=>{const h=e.target.closest('.ghead');if(!h)return;const k=h.dataset.k;
+ if(scenOpen.has(k))scenOpen.delete(k);else scenOpen.add(k);lsSet('swiftsim.scen.open',[...scenOpen]);renderScen()});
+function openAll(on){const ks=new Set((scenData.scenarios||[]).map(gkey));scenOpen=on?ks:new Set();lsSet('swiftsim.scen.open',[...scenOpen]);renderScen()}
+async function loadScen(){
+ const d=await j('/api/scenarios');scenData=d;
+ if(scenOpen==null){const saved=lsGet('swiftsim.scen.open',null);if(Array.isArray(saved))scenOpen=new Set(saved)}
+ renderScen();
+ const cur=$('sScen').value;
+ $('sScen').innerHTML='<option value="">(使用激活场景)</option>'+d.scenarios.map(s=>`<option>${s.id}</option>`).join('');$('sScen').value=cur;
+}
+function setSendCollapsed(c){$('sendPane').classList.toggle('collapsed',c);lsSet('swiftsim.send.collapsed',c)}
+function toggleSend(){setSendCollapsed(!$('sendPane').classList.contains('collapsed'))}
+function showResult(r){$('sResult').textContent=JSON.stringify(r,null,2);
+ const o=(r&&typeof r==='object')?r:{};const st=o.status||o.result||o.error||'';
+ $('sSum').textContent='最近结果: '+[o.msgType||o.type,st,o.id!=null?'#'+o.id:''].filter(x=>x).join(' ')||'';}
+setSendCollapsed(lsGet('swiftsim.send.collapsed',false));
+async function act(id){await j('/api/scenarios/'+id+'/activate',{method:'POST'});lsSet('swiftsim.scen.lastAct',id);loadScen()}
 async function trig(id){const vars={};if($('trigRef').value)vars.ref=$('trigRef').value;
  const r=await j('/api/scenarios/'+id+'/trigger?format='+$('trigFmt').value,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(vars)});
- $('sResult').textContent=JSON.stringify(r,null,2);loadScen();setTimeout(load,500)}
+ showResult(r);loadScen();setTimeout(load,500)}
 async function loadParts(){parts=await j('/api/participants');
  const o=parts.map(p=>`<option value="${p.id}">${p.id} (${p.bic})</option>`).join('');
  $('sFrom').innerHTML='<option value="">(取自报文头)</option>'+o;$('sTo').innerHTML='<option value="">(取自报文头)</option>'+o;}
@@ -142,7 +227,7 @@ async function send(){const q=new URLSearchParams({channel:'UI'});
  if($('sFrom').value)q.set('from',$('sFrom').value);if($('sTo').value)q.set('to',$('sTo').value);
  if($('sMt').value)q.set('mtType',$('sMt').value);if($('sScen').value)q.set('scenario',$('sScen').value);
  const r=await j('/api/messages?'+q,{method:'POST',headers:{'Content-Type':'text/plain'},body:$('sBody').value});
- $('sResult').textContent=JSON.stringify(r,null,2);setTimeout(load,300)}
+ showResult(r);setTimeout(load,300)}
 async function clearLog(){if(confirm('确定清空全部日志?')){await j('/api/messages',{method:'DELETE'});load()}}
 let curTab='log',curItem=null,curU=null;
 function tab(t){curTab=t;['log','ldg','rv'].forEach(x=>{$('v-'+x).classList.toggle('on',x===t);$('tab-'+x).classList.toggle('on',x===t)});if(t==='ldg')loadU();if(t==='rv'){loadRv();loadModes()}}

@@ -7,6 +7,7 @@ import com.example.swiftsim.domain.MessageRecord;
 import com.example.swiftsim.domain.MessageRepository;
 import com.example.swiftsim.gateway.GatewayService;
 import com.example.swiftsim.gateway.SessionService;
+import com.example.swiftsim.ledger.BankingCalendar;
 import com.example.swiftsim.ledger.BusinessClock;
 import com.example.swiftsim.ledger.LedgerService;
 import com.example.swiftsim.parse.ParsedMessage;
@@ -43,6 +44,7 @@ public class OpsService {
     private final ConfigService cfg;
     private final SessionService sessions;
     private final BusinessClock clock;
+    private final BankingCalendar calendar;
     private final ReviewItemRepository reviewItems;
     private final ReviewModeService reviewMode;
     private final ScenarioEngine engine;
@@ -314,7 +316,7 @@ public class OpsService {
             Map.entry("MT750", List.of("MT752", "MT734", "MT759")), Map.entry("MT742", List.of("MT756", "MT744", "MT202")),
             Map.entry("MT400", List.of("MT410", "MT499", "MT412", "MT416")), Map.entry("MT420", List.of("MT422", "MT499")),
             Map.entry("MT430", List.of("MT410", "MT499")));
-    private static final Set<String> AWAIT = Set.of("AMENDMENT_PENDING", "DEMAND_RECEIVED", "EXTEND_OR_PAY_PENDING", "DOCS_PRESENTED", "DISCREPANT", "TRACER", "PRE_ADVISED", "APPLIED");
+    private static final Set<String> AWAIT = Set.of("AMENDMENT_PENDING", "DEMAND_RECEIVED", "DEMAND_ACCEPTED", "PARTIALLY_PAID", "EXTEND_OR_PAY_PENDING", "DOCS_PRESENTED", "DISCREPANT", "TRACER", "PRE_ADVISED", "APPLIED", "REQUESTED");
 
     /** Consistency / completeness check of one business flow: returns findings with severity, code, message and evidence (message ids). */
     @SuppressWarnings("unchecked")
@@ -410,7 +412,7 @@ public class OpsService {
             for (Map<String, Object> p : (List<Map<String, Object>>) b.getOrDefault("presentations", List.of())) {
                 if ("PRESENTED".equals(p.get("status")) || "DISCREPANT".equals(p.get("status"))) {
                     LocalDate on = p.get("presentedOn") == null ? null : LocalDate.parse(String.valueOf(p.get("presentedOn")));
-                    if (on != null && bankingDays(on, today) > 5)
+                    if (on != null && calendar.between(on, today) > 5)
                         f.add(finding("WARN", "REC-L06-EXAM", "presentation " + p.get("presentationRef") + " presented " + on + " is still " + p.get("status") + " after more than 5 banking days (UCP 600 art. 14b/16d)", idsOf(p)));
                 }
                 BigDecimal pa = dec(p.get("amount")), pp = dec(p.get("paidAmount"));
@@ -472,13 +474,6 @@ public class OpsService {
         List<Integer> seq = am.stream().map(a -> a.get("seqNo")).filter(Objects::nonNull).map(o -> ((Number) o).intValue()).sorted().toList();
         for (int i = 0; i < seq.size(); i++)
             if (seq.get(i) != i + 1) { f.add(finding("WARN", "REC-AMD-SEQ", "amendment sequence numbers not contiguous: " + seq, null)); return; }
-    }
-
-    private static int bankingDays(LocalDate from, LocalDate to) {
-        int n = 0;
-        for (LocalDate d = from.plusDays(1); !d.isAfter(to); d = d.plusDays(1))
-            if (d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY) n++;
-        return n;
     }
 
     private static List<Long> idsOf(Map<String, Object> m) {

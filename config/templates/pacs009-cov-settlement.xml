@@ -1,0 +1,30 @@
+<!-- pacs.009 COV: cover of an underlying customer credit transfer (CBPR+ equivalent of MT202 COV). -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.009.001.08">
+  <FICdtTrf>
+    <GrpHdr>
+      <MsgId>${newRef}</MsgId>
+      <CreDtTm>${nowUtc}</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf><SttlmMtd>INDA</SttlmMtd></SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <InstrId>${newRef}</InstrId>
+        <EndToEndId>${e2e|lc_presRef|f20|ref}</EndToEndId>
+        <UETR>${uetr}</UETR>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="${currency}">${amountIso}</IntrBkSttlmAmt>
+      <IntrBkSttlmDt>${todayIso}</IntrBkSttlmDt>
+      <InstgAgt><FinInstnId><BICFI>${fromBic}</BICFI></FinInstnId></InstgAgt>
+      <InstdAgt><FinInstnId><BICFI>${toBic}</BICFI></FinInstnId></InstdAgt>
+      <Dbtr><FinInstnId><BICFI>${fromBic}</BICFI></FinInstnId></Dbtr>
+      <Cdtr><FinInstnId><BICFI>${toBic}</BICFI></FinInstnId></Cdtr>
+      <UndrlygCstmrCdtTrf>
+        <Dbtr><Nm>${applicant|'UNDERLYING DEBTOR'}</Nm></Dbtr>
+        <DbtrAgt><FinInstnId><BICFI>${fromBic}</BICFI></FinInstnId></DbtrAgt>
+        <CdtrAgt><FinInstnId><BICFI>${toBic}</BICFI></FinInstnId></CdtrAgt>
+        <Cdtr><Nm>${beneficiary|'UNDERLYING CREDITOR'}</Nm></Cdtr>
+      </UndrlygCstmrCdtTrf>
+    </CdtTrfTxInf>
+  </FICdtTrf>
+</Document>

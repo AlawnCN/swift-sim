@@ -18,6 +18,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Transaction ledger + lifecycle state machine of guarantees / standby LCs. Every message delivered by the gateway is
@@ -35,6 +37,7 @@ public class LedgerService {
     private final DemandRepository demands;
     private final MovementRepository movements;
     private final LedgerEventRepository events;
+    private final TradeEventRepository tradeEvents;
     private final MessageRepository messages;
     private final ConfigService cfg;
     private final BusinessClock clock;
@@ -48,8 +51,11 @@ public class LedgerService {
 
     public enum Action {
         ISSUE, APPLY, AMEND, AMEND_RESP, DEMAND, DEMAND_REFUSAL, DEMAND_WITHDRAWAL, SETTLEMENT, EOP_REQUEST, EOP_RESPONSE,
-        NON_EXT, NON_EXT_REQ, REDUCTION, TERMINATION, ACK, STATUS, ANCILLARY, OTHER
+        NON_EXT, NON_EXT_REQ, REDUCTION, TERMINATION, ACK, STATUS, ANCILLARY, CONTINUATION, CANCEL_REQUEST, OTHER
     }
+
+    private static final Set<String> OPEN_DEMAND = Set.of("RECEIVED", "ACCEPTED", "PARTIALLY_PAID");
+    private static final Pattern LOCAL_REF = Pattern.compile("/LOCALREF/([A-Za-z0-9]{1,34})");
 
     public record Outcome(String status, List<String> errors, String ref, String fromStatus, String toStatus, Map<String, String> vars) {
         public boolean rejected() { return "REJECTED".equals(status); }
@@ -65,7 +71,7 @@ public class LedgerService {
             case "MT765", "tsrv.013" -> Action.DEMAND;
             case "MT786", "tsrv.016" -> Action.DEMAND_REFUSAL;
             case "tsrv.017" -> Action.DEMAND_WITHDRAWAL;
-            case "MT202" -> Action.SETTLEMENT;
+            case "MT202", "MT103", "pacs.008", "pacs.009" -> Action.SETTLEMENT;
             case "tsrv.014" -> Action.EOP_REQUEST;
             case "tsrv.015" -> Action.EOP_RESPONSE;
             case "MT785", "tsrv.011" -> Action.NON_EXT;
@@ -74,7 +80,9 @@ public class LedgerService {
             case "tsrv.012" -> Action.TERMINATION;
             case "MT768" -> Action.ACK;
             case "tsrv.019" -> Action.STATUS;
-            case "MT759" -> Action.ANCILLARY;
+            case "MT759", "MT796" -> Action.ANCILLARY;
+            case "MT761", "MT775" -> Action.CONTINUATION;
+            case "MT792" -> Action.CANCEL_REQUEST;
             default -> Action.OTHER;
         };
     }
@@ -86,9 +94,20 @@ public class LedgerService {
     }
 
     /** Check + apply one delivered message. Synchronized: single simulator instance, strictly ordered ledger. */
+    /** True when this message id already wrote a ledger event (replay must not apply it again). */
+    public boolean alreadyApplied(Long messageId) {
+        if (messageId == null) return false;
+        return events.existsByMessageId(messageId) || tradeEvents.existsByMessageId(messageId);
+    }
+
     public synchronized Outcome process(MessageRecord rec, ParsedMessage pm, boolean receiverIsSut, boolean businessReject) {
         try {
-            return tx().execute(s -> doProcess(rec, pm, receiverIsSut, businessReject));
+            return tx().execute(s -> {
+                if (alreadyApplied(rec.getId())) {
+                    return new Outcome("DUPLICATE_IGNORED", List.of(), rec.getTxRef(), null, null, Map.of("ldg_outcome", "DUPLICATE_IGNORED"));
+                }
+                return doProcess(rec, pm, receiverIsSut, businessReject);
+            });
         } catch (Exception e) {
             log.error("ledger processing of message {} failed", rec.getId(), e);
             return new Outcome("INFO", List.of("ledger error: " + e.getMessage()), pm.getTxRef(), null, null, Map.of());
@@ -99,7 +118,7 @@ public class LedgerService {
     TradeLedger tradeFor(ParsedMessage pm) {
         for (TradeLedger t : trade) if (t.ownsMessage(pm)) return t;
         String st = pm.getShortType();
-        if (st != null && Set.of("MT759", "MT799", "MT202", "MT103", "MT499").contains(st)) {
+        if (st != null && Set.of("MT759", "MT799", "MT202", "MT103", "MT499", "MT792", "MT796", "pacs.008", "pacs.009").contains(st)) {
             String ref = Facts.of(pm).ref;
             if (ref != null && repo.findByRef(ref).isPresent()) return null;
             for (TradeLedger t : trade) if (t.references(pm)) return t;
@@ -158,10 +177,18 @@ public class LedgerService {
         switch (a) {
             case ISSUE -> {
                 if (ref == null) errs.add("BIZ-V00 undertaking number missing");
-                else if (u != null && !"APPLIED".equals(u.getMilestone()))
+                else if (u != null && !"APPLIED".equals(u.getMilestone()) && !"REQUESTED".equals(u.getMilestone()))
                     errs.add("BIZ-U02 duplicate undertaking number " + ref + ": already known (status " + u.getStatus() + ", issuer " + u.getIssuerBic() + ", issued " + u.getIssueDate() + ")");
                 if (u != null && "APPLIED".equals(u.getMilestone()) && !roles(u, sender).contains("ISSUER"))
                     errs.add("BIZ-R03 " + sender + " is not the bank the application " + ref + " was sent to (issuer " + u.getIssuerBic() + ")");
+                if (u != null && "REQUESTED".equals(u.getMilestone()) && !sender.equals(u.getIssuerBic()))
+                    errs.add("BIZ-R03 " + sender + " is not the bank requested to issue local undertaking " + ref + " (issuer " + u.getIssuerBic() + ")");
+                String purpose = purposeOf(pm);
+                if (("ISCO".equals(purpose) || "ICCA".equals(purpose)) && ref != null) {
+                    String localRef = localRefOf(pm, ref);
+                    if (localRef.equals(ref)) errs.add("BIZ-U02 local undertaking reference equals the counter-undertaking reference " + ref);
+                    else if (repo.findByRef(localRef).isPresent()) errs.add("BIZ-U02 local undertaking number " + localRef + " already known");
+                }
                 if (f.currency == null || f.amount == null) errs.add("BIZ-V03 undertaking currency/amount missing");
                 if (f.expiryDate != null && f.issueDate != null && f.expiryDate.isBefore(f.issueDate))
                     errs.add("BIZ-V01 expiry date " + f.expiryDate + " is before the issue date " + f.issueDate);
@@ -222,7 +249,7 @@ public class LedgerService {
         Set<String> sr = roles(u, sender), rr = roles(u, receiver);
         // MT759 is free-format ancillary traffic and is frequently exchanged with banks that are not (yet) a party
         // (e.g. the applicant's bank) - simulator simplification: no party/state check, only linked to the history
-        if (a == Action.ANCILLARY) return errs;
+        if (a == Action.ANCILLARY || a == Action.CONTINUATION || a == Action.CANCEL_REQUEST) return errs;
         if (sr.isEmpty()) errs.add("BIZ-R01 sender " + sender + " is not a party of undertaking " + u.getRef() + " (parties: " + partyList(u) + ")");
         if (rr.isEmpty()) errs.add("BIZ-R02 receiver " + receiver + " is not a party of undertaking " + u.getRef() + " (parties: " + partyList(u) + ")");
         if (!errs.isEmpty()) return errs;
@@ -237,10 +264,10 @@ public class LedgerService {
         if (!need.isEmpty()) errs.addAll(Arrays.asList(need.strip().split("\n")));
         if (!errs.isEmpty()) return errs;
         String st = u.getStatus();
-        boolean info = a == Action.ACK || a == Action.STATUS || a == Action.ANCILLARY;
+        boolean info = a == Action.ACK || a == Action.STATUS || a == Action.ANCILLARY || a == Action.CONTINUATION || a == Action.CANCEL_REQUEST;
         boolean resolvesDemand = a == Action.DEMAND_REFUSAL || a == Action.SETTLEMENT || a == Action.DEMAND_WITHDRAWAL || a == Action.EOP_REQUEST || a == Action.EOP_RESPONSE;
-        if ("APPLIED".equals(u.getMilestone()) && !info)
-            errs.add("BIZ-S01 " + a + " not allowed before issuance: " + u.getRef() + " is only an application (APPLIED)");
+        if (("APPLIED".equals(u.getMilestone()) || "REQUESTED".equals(u.getMilestone())) && !info)
+            errs.add("BIZ-S01 " + a + " not allowed before issuance: " + u.getRef() + " is " + u.getMilestone());
         else if (TERMINAL.contains(st) && !info && !(resolvesDemand && pendingDemand(u) != null)) {
             if (a == Action.DEMAND && "EXPIRED".equals(st))
                 errs.add("BIZ-S02 demand after expiry: undertaking " + u.getRef() + " expired on " + u.getExpiryDate() + " (business date " + clock.today() + ")");
@@ -392,7 +419,8 @@ public class LedgerService {
                 if (a == Action.SETTLEMENT || a == Action.DEMAND_REFUSAL) currency(u, f, errs);
                 BigDecimal pay = a == Action.SETTLEMENT ? f.amount : null;
                 if (pd != null && pay != null) {
-                    if (pay.compareTo(pd.getAmount()) > 0) errs.add("BIZ-D08 payment " + fmt(pay) + " exceeds the demanded amount " + fmt(pd.getAmount()));
+                    BigDecimal remaining = pd.getAmount().subtract(z(pd.getPaidAmount()));
+                    if (pay.compareTo(remaining) > 0) errs.add("BIZ-D08 payment " + fmt(pay) + " exceeds the unpaid demand amount " + fmt(remaining));
                     if (pay.compareTo(u.getOutstanding()) > 0) errs.add("BIZ-M01 payment " + fmt(pay) + " exceeds the outstanding amount " + fmt(u.getOutstanding()));
                 }
                 if (!errs.isEmpty()) return null;
@@ -419,7 +447,7 @@ public class LedgerService {
                         save(u, rec);
                         event(u, "DEMAND_WITHDRAWN", from, u.getStatus(), rec, "demand " + pd.getDemandRef() + " withdrawn by the presenter" + ("MT759".equals(pm.getShortType()) ? " (MT759 OTHERFNC withdrawal convention)" : ""));
                     } else {
-                        pay(u, pd, pay != null ? pay : pd.getAmount(), rec, from);
+                        pay(u, pd, pay != null ? pay : pd.getAmount().subtract(z(pd.getPaidAmount())), rec, from);
                     }
                     out.put("ldg_demandStatus", pd.getStatus());
                 };
@@ -498,16 +526,38 @@ public class LedgerService {
                         return;
                     }
                     Demand pd = pendingDemand(u);
-                    if (a == Action.STATUS && sr.contains("ISSUER") && pd != null && "PAYM".equals(pd.getType()) && "DMND".equals(f.statusCategory) && "ACCP".equals(sts)) {
-                        // MX demand-paid convention (no pacs.009 simulated): issuer's tsrv.019 DMND/ACCP = demand honoured
-                        pd.setResolutionMessageId(rec.getId());
-                        pd.setResolvedAt(Instant.now());
-                        pay(u, pd, pd.getAmount(), rec, from);
+                    if (a == Action.STATUS && sr.contains("ISSUER") && pd != null && "PAYM".equals(pd.getType()) && "DMND".equals(f.statusCategory) && "ACCP".equals(sts)
+                            && "RECEIVED".equals(pd.getStatus())) {
+                        // Acceptance only. Settlement (MT202/MT103 or pacs.008/pacs.009) moves the demand to PAID.
+                        pd.setStatus("ACCEPTED");
+                        demands.save(pd);
+                        save(u, rec);
+                        event(u, "DEMAND_ACCEPTED", from, u.getStatus(), rec, "demand " + pd.getDemandRef() + " accepted; payment will follow by MT202/MT103 or pacs.008/pacs.009");
+                        out.put("ldg_demandStatus", pd.getStatus());
                         return;
                     }
                     save(u, rec);
                     event(u, a == Action.ACK ? "ACKNOWLEDGED" : "STATUS_REPORT", from, u.getStatus(), rec,
                             a == Action.ACK ? "MT768 acknowledgement" : "status " + f.statusCategory + "/" + sts);
+                };
+            }
+            case CONTINUATION -> {
+                return () -> {
+                    String text = firstNonBlank(pm.getVars().get("f77U"), pm.getVars().get("f77L"));
+                    String add = (pm.getShortType() + " " + pm.getVars().getOrDefault("f27", "") + "\n" + (text == null ? "" : text)).trim();
+                    String prev = u.getAdditionalTerms();
+                    u.setAdditionalTerms(trunc((prev == null || prev.isBlank() ? "" : prev + "\n") + add, 8000));
+                    save(u, rec);
+                    event(u, "CONTINUATION", u.getStatus(), u.getStatus(), rec, pm.getShortType() + " continuation appended (" + pm.getVars().getOrDefault("f27", "") + ")");
+                };
+            }
+            case CANCEL_REQUEST -> {
+                return () -> {
+                    save(u, rec);
+                    event(u, "CANCELLATION_REQUESTED", u.getStatus(), u.getStatus(), rec,
+                            "MT792 request for cancellation of " + pm.getVars().getOrDefault("f11S", "a previous message")
+                                    + ". This does not cancel an irrevocable undertaking; amend with MT767 / tsrv.005. "
+                                    + trunc(pm.getVars().getOrDefault("f79", "").replace('\n', ' '), 300));
                 };
             }
             case ANCILLARY -> {
@@ -549,15 +599,25 @@ public class LedgerService {
     }
 
     private void pay(Undertaking u, Demand pd, BigDecimal amt, MessageRecord rec, String from) {
-        pd.setStatus("PAID");
-        pd.setPaidAmount(amt);
+        BigDecimal total = z(pd.getPaidAmount()).add(amt);
+        boolean full = total.compareTo(pd.getAmount()) >= 0;
+        pd.setPaidAmount(total);
+        pd.setStatus(full ? "PAID" : "PARTIALLY_PAID");
+        if (full) {
+            pd.setResolutionMessageId(rec.getId());
+            pd.setResolvedAt(Instant.now());
+        }
         demands.save(pd);
         u.setOutstanding(u.getOutstanding().subtract(amt));
-        movement(u, "PAYMENT", amt, rec, pd.getDemandRef(), null);
-        u.setMilestone("PAID");
+        movement(u, "PAYMENT", amt, rec, pd.getDemandRef(), full ? null : "partial payment");
+        if (full) u.setMilestone("PAID");
         save(u, rec);
-        event(u, "DEMAND_PAID", from, u.getStatus(), rec, "demand " + pd.getDemandRef() + " paid " + u.getCurrency() + " " + fmt(amt) + "; outstanding " + fmt(u.getOutstanding()));
+        event(u, full ? "DEMAND_PAID" : "DEMAND_PART_PAID", from, u.getStatus(), rec,
+                "demand " + pd.getDemandRef() + (full ? " paid " : " partially paid ") + u.getCurrency() + " " + fmt(amt)
+                        + " (paid " + fmt(total) + " of " + fmt(pd.getAmount()) + "); outstanding " + fmt(u.getOutstanding()));
     }
+
+    private static BigDecimal z(BigDecimal b) { return b == null ? BigDecimal.ZERO : b; }
 
     private void currency(Undertaking u, Facts f, List<String> errs) {
         if (f.currency != null && u.getCurrency() != null && !f.currency.equals(u.getCurrency()))
@@ -587,25 +647,31 @@ public class LedgerService {
     }
 
     private void issue(Undertaking existing, Facts f, ParsedMessage pm, MessageRecord rec, Map<String, String> out) {
+        boolean promoting = existing != null && "REQUESTED".equals(existing.getMilestone());
         Undertaking u = existing != null ? existing : new Undertaking();
         String from = existing == null ? null : existing.getStatus();
+        BigDecimal previous = promoting ? u.getAmount() : null;
+        String purpose = purposeOf(pm);
+        boolean counter = "ISCO".equals(purpose) || "ICCA".equals(purpose);
         u.setRef(f.ref);
         u.setFormat(pm.getFormat());
         u.setFormOfUndertaking(f.form);
         u.setRules(f.rules);
         u.setCurrency(f.currency);
-        u.setOriginalAmount(f.amount);
+        if (!promoting) u.setOriginalAmount(f.amount);
         u.setAmount(f.amount);
-        u.setOutstanding(f.amount);
+        u.setOutstanding(promoting && previous != null && f.amount != null ? z(u.getOutstanding()).add(f.amount.subtract(previous)) : f.amount);
         u.setIssueDate(f.issueDate != null ? f.issueDate : clock.today());
         u.setExpiryType(f.expiryType != null ? f.expiryType : f.expiryDate != null ? "FIXD" : null);
         u.setExpiryDate(f.expiryDate);
         if (f.beneficiary != null) u.setBeneficiary(trunc(f.beneficiary.replace("\n", " / "), 600));
         if (f.applicant != null) u.setApplicant(trunc(f.applicant.replace("\n", " / "), 600));
         u.setIssuerBic(rec.getSenderBic());
+        u.setPurpose(purpose);
+        if (u.getObligationKind() == null) u.setObligationKind(counter ? "COUNTER" : "UNDERTAKING");
         u.setMilestone("ISSUED");
         if (u.getCreatedAt() == null) u.setCreatedAt(Instant.now());
-        u.setOriginMessageId(rec.getId());
+        if (!promoting) u.setOriginMessageId(rec.getId());
         save(u, rec);
         String sender = rec.getSenderBic(), receiver = rec.getReceiverBic();
         addParty(u, sender, "ISSUER", "sender of " + pm.getMsgType());
@@ -617,9 +683,91 @@ public class LedgerService {
         if (f.secondAdvisingBic != null && cfg.byBic(f.secondAdvisingBic).isPresent()) addParty(u, f.secondAdvisingBic, "SECOND_ADVISING", "second advising bank field");
         if (f.beneficiaryBic != null && !f.beneficiaryBic.equals(receiver) && cfg.byBic(f.beneficiaryBic).isPresent()) addParty(u, f.beneficiaryBic, "BENEFICIARY", "beneficiary field (BIC)");
         if (f.applicantBic != null && cfg.byBic(f.applicantBic).isPresent()) addParty(u, f.applicantBic, "APPLICANT", "applicant field (BIC)");
-        movement(u, "ISSUE", f.amount, rec, null, null);
-        event(u, "ISSUED", from, u.getStatus(), rec, pm.getMsgType() + " " + u.getFormOfUndertaking() + " " + u.getCurrency() + " " + fmt(u.getAmount())
-                + " expiry " + u.getExpiryType() + " " + u.getExpiryDate() + " rules " + u.getRules() + " issuer " + sender + " -> " + receiver);
+        if (!promoting) movement(u, "ISSUE", f.amount, rec, null, null);
+        else if (previous != null && f.amount != null && f.amount.compareTo(previous) != 0)
+            movement(u, f.amount.compareTo(previous) > 0 ? "INCREASE" : "DECREASE", f.amount.subtract(previous).abs(), rec, null, "issued amount differs from the requested local undertaking");
+        event(u, promoting ? "ISSUED" : "ISSUED", from, u.getStatus(), rec, (promoting ? "requested local undertaking issued: " : "")
+                + pm.getMsgType() + " " + u.getFormOfUndertaking() + " " + u.getCurrency() + " " + fmt(u.getAmount())
+                + " expiry " + u.getExpiryType() + " " + u.getExpiryDate() + " rules " + u.getRules() + " issuer " + sender + " -> " + receiver
+                + (purpose != null ? " purpose " + purpose : ""));
+        if (counter && !promoting) {
+            String localRef = bookLocal(u, pm, rec);
+            if (localRef != null) out.put("ldg_localRef", localRef);
+        }
+    }
+
+    /** Sequence C of MT760 ISCO/ICCA is a second obligation, linked to the counter-undertaking. */
+    private String bookLocal(Undertaking counter, ParsedMessage pm, MessageRecord rec) {
+        Map<String, String> v = pm.getVars();
+        String localRef = localRefOf(pm, counter.getRef());
+        Undertaking local = new Undertaking();
+        local.setRef(localRef);
+        local.setFormat(pm.getFormat());
+        local.setFormOfUndertaking(trimCode(v.get("seqC_22D")));
+        local.setRules(trimCode(v.get("seqC_40C")));
+        String ccyAmt = v.get("seqC_32B");
+        local.setCurrency(Facts.mtCurrency(ccyAmt, false));
+        BigDecimal amt = Facts.mtAmount(ccyAmt);
+        local.setOriginalAmount(amt);
+        local.setAmount(amt);
+        local.setOutstanding(amt);
+        local.setIssueDate(counter.getIssueDate());
+        local.setExpiryType(trimCode(v.get("seqC_23B")));
+        local.setExpiryDate(Facts.mtDate(v.get("seqC_31E")));
+        if (v.get("seqC_59") != null || v.get("seqC_59A") != null)
+            local.setBeneficiary(trunc((v.get("seqC_59") != null ? v.get("seqC_59") : v.get("seqC_59A")).replace("\n", " / "), 600));
+        if (v.get("seqC_50") != null) local.setApplicant(trunc(v.get("seqC_50").replace("\n", " / "), 600));
+        local.setIssuerBic(rec.getReceiverBic());
+        local.setPurpose(counter.getPurpose());
+        local.setObligationKind("LOCAL");
+        local.setRelatedRef(counter.getRef());
+        local.setMilestone("REQUESTED");
+        local.setCreatedAt(Instant.now());
+        local.setOriginMessageId(rec.getId());
+        String terms = firstNonBlank(v.get("seqC_77L"), v.get("seqC_77U"));
+        if (terms != null) local.setAdditionalTerms(trunc(terms, 8000));
+        save(local, rec);
+        addParty(local, rec.getReceiverBic(), "ISSUER", "requested local issuer (receiver of MT760 " + counter.getPurpose() + ")");
+        addParty(local, rec.getSenderBic(), "APPLICANT", "counter-guarantor");
+        movement(local, "REQUEST", amt, rec, null, "requested by counter-undertaking " + counter.getRef());
+        event(local, "LOCAL_REQUESTED", null, local.getStatus(), rec, "local undertaking " + localRef + " requested under counter-undertaking " + counter.getRef()
+                + " " + local.getCurrency() + " " + fmt(amt) + " form " + local.getFormOfUndertaking());
+        counter.setRelatedRef(localRef);
+        counter.setObligationKind("COUNTER");
+        save(counter, rec);
+        event(counter, "COUNTER_LINKED", counter.getStatus(), counter.getStatus(), rec, "linked local undertaking " + localRef);
+        return localRef;
+    }
+
+    static String purposeOf(ParsedMessage pm) {
+        String p = pm.getVars().get("f22A");
+        if (p == null) return null;
+        String t = p.trim().split("[\\n/]", 2)[0].trim();
+        return t.length() > 4 ? t.substring(0, 4) : t;
+    }
+
+    static String localRefOf(ParsedMessage pm, String counterRef) {
+        String blob = String.join("\n",
+                pm.getVars().getOrDefault("f72Z", ""),
+                pm.getVars().getOrDefault("f77U", ""),
+                pm.getVars().getOrDefault("seqC_77L", ""),
+                pm.getVars().getOrDefault("seqC_77U", ""));
+        Matcher m = LOCAL_REF.matcher(blob);
+        if (m.find()) return m.group(1).toUpperCase();
+        String gen = "L" + (counterRef == null ? "" : counterRef);
+        return gen.length() <= 64 ? gen : gen.substring(0, 64);
+    }
+
+    private static String trimCode(String s) {
+        if (s == null) return null;
+        String t = s.trim().split("[\\n/]", 2)[0].trim();
+        return t.length() > 8 ? t.substring(0, 8) : t;
+    }
+
+    private static String firstNonBlank(String... ss) {
+        if (ss == null) return null;
+        for (String s : ss) if (s != null && !s.isBlank()) return s;
+        return null;
     }
 
     private void applyApplication(Facts f, ParsedMessage pm, MessageRecord rec, Map<String, String> out) {
@@ -654,11 +802,11 @@ public class LedgerService {
     }
 
     public Demand pendingDemand(Undertaking u) {
-        return demands.findByUndertakingIdOrderByIdAsc(u.getId()).stream().filter(d -> "RECEIVED".equals(d.getStatus())).reduce((a, b) -> b).orElse(null);
+        return demands.findByUndertakingIdOrderByIdAsc(u.getId()).stream().filter(d -> OPEN_DEMAND.contains(d.getStatus())).reduce((a, b) -> b).orElse(null);
     }
 
     private Demand findPendingDemand(Undertaking u, String ref) {
-        List<Demand> pend = demands.findByUndertakingIdOrderByIdAsc(u.getId()).stream().filter(d -> "RECEIVED".equals(d.getStatus())).toList();
+        List<Demand> pend = demands.findByUndertakingIdOrderByIdAsc(u.getId()).stream().filter(d -> OPEN_DEMAND.contains(d.getStatus())).toList();
         if (ref != null) {
             Optional<Demand> m = pend.stream().filter(d -> ref.equals(d.getDemandRef())).findFirst();
             return m.orElse(null);
@@ -720,9 +868,14 @@ public class LedgerService {
 
     String derive(Undertaking u) {
         String m = u.getMilestone();
-        if (TERMINAL.contains(m) || "APPLIED".equals(m)) return m;
+        if (TERMINAL.contains(m) || "APPLIED".equals(m) || "REQUESTED".equals(m)) return m;
         Demand d = u.getId() == null ? null : pendingDemand(u);
-        if (d != null) return "PAEX".equals(d.getType()) ? "EXTEND_OR_PAY_PENDING" : "DEMAND_RECEIVED";
+        if (d != null) {
+            if ("PAEX".equals(d.getType()) && "RECEIVED".equals(d.getStatus())) return "EXTEND_OR_PAY_PENDING";
+            if ("PARTIALLY_PAID".equals(d.getStatus())) return "PARTIALLY_PAID";
+            if ("ACCEPTED".equals(d.getStatus())) return "DEMAND_ACCEPTED";
+            return "DEMAND_RECEIVED";
+        }
         if (u.getId() != null && pendingAmendment(u) != null) return "AMENDMENT_PENDING";
         return m;
     }
@@ -1005,6 +1158,10 @@ public class LedgerService {
         m.put("expiryType", u.getExpiryType());
         m.put("expiryDate", u.getExpiryDate());
         m.put("issuerBic", u.getIssuerBic());
+        m.put("purpose", u.getPurpose());
+        m.put("obligationKind", u.getObligationKind());
+        m.put("relatedRef", u.getRelatedRef());
+        m.put("additionalTerms", u.getAdditionalTerms());
         m.put("beneficiary", u.getBeneficiary());
         m.put("applicant", u.getApplicant());
         m.put("nonExtensionNotified", u.isNonExtensionNotified());

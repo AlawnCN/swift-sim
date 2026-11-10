@@ -53,6 +53,16 @@ public class Undertaking {
     private Instant updatedAt;
     private Long originMessageId;
     private Long lastMessageId;
+    /** MT760 22A: ISSU, ISCO, ICCA, ADVI, ACNA */
+    private String purpose;
+    /** UNDERTAKING (direct issue), COUNTER (sequence B of ISCO/ICCA), LOCAL (sequence C, requested local undertaking) */
+    private String obligationKind;
+    /** the other obligation when this is one side of a counter-guarantee */
+    @Column(length = 64)
+    private String relatedRef;
+    /** MT761/MT775 narrative appended to the undertaking terms */
+    @Column(length = 8000)
+    private String additionalTerms;
     /** open MT759 query from a counterparty bank awaiting the SUT's answer (nullable: added after the first release) */
     private String openQueryRef;
     private String openQueryFrom;

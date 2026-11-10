@@ -8,4 +8,6 @@ public interface LedgerEventRepository extends JpaRepository<LedgerEvent, Long> 
     List<LedgerEvent> findByUndertakingIdOrderByIdAsc(Long undertakingId);
 
     List<LedgerEvent> findByRefAndUndertakingIdIsNullOrderByIdAsc(String ref);
+
+    boolean existsByMessageId(Long messageId);
 }

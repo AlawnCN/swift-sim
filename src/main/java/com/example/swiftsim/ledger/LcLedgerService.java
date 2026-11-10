@@ -14,6 +14,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.example.swiftsim.ledger.TradeSupport.*;
 
@@ -32,6 +34,7 @@ public class LcLedgerService implements TradeLedger {
     private final LcPresentationRepository items;
     private final MessageRepository messages;
     private final TradeSupport ts;
+    private final BankingCalendar calendar;
 
     public static final Set<String> TERMINAL = Set.of("CANCELLED", "EXPIRED");
     static final Set<String> NON_ISSUER = Set.of("ADVISING", "SECOND_ADVISING", "CONFIRMING", "NOMINATED", "REQUESTED_CONFIRMER", "TRANSFERRING",
@@ -65,7 +68,7 @@ public class LcLedgerService implements TradeLedger {
             case "MT752" -> A.AUTHORISATION;
             case "MT754" -> A.PRESENTATION;
             case "MT756" -> A.REIMBURSEMENT;
-            case "MT202", "MT103" -> A.SETTLEMENT;
+            case "MT202", "MT103", "pacs.008", "pacs.009" -> A.SETTLEMENT;
             default -> A.FREE;
         };
     }
@@ -392,10 +395,13 @@ public class LcLedgerService implements TradeLedger {
             case CONTINUATION, FREE -> {
                 return () -> {
                     save(lc, rec);
-                    ts.event(K, lc.getId(), lc.getRef(), a == A.CONTINUATION ? "CONTINUATION" : "ANCILLARY_MESSAGE", from, lc.getStatus(), rec,
-                            pm.getMsgType() + (a == A.CONTINUATION ? " continuation linked" : " free-format / ancillary message linked"
+                    String mt792 = "MT792".equals(pm.getShortType())
+                            ? " MT792 cancellation request recorded; it does not cancel an irrevocable credit (use MT707). " + trunc(flat(v.get("f79")), 240)
+                            : "";
+                    ts.event(K, lc.getId(), lc.getRef(), a == A.CONTINUATION ? "CONTINUATION" : "MT792".equals(pm.getShortType()) ? "CANCELLATION_REQUESTED" : "ANCILLARY_MESSAGE", from, lc.getStatus(), rec,
+                            pm.getMsgType() + (a == A.CONTINUATION ? " continuation linked" : mt792.isEmpty() ? " free-format / ancillary message linked"
                                     + (v.get("f23H") != null ? " (" + v.get("f23H").trim() + ")" : "") + (v.get("f79") != null ? ": " + trunc(flat(v.get("f79")), 300) : "")
-                                    + (v.get("f45D") != null ? ": " + trunc(flat(v.get("f45D")), 300) : "")));
+                                    + (v.get("f45D") != null ? ": " + trunc(flat(v.get("f45D")), 300) : "") : mt792));
                 };
             }
             case AMEND -> {
@@ -545,8 +551,11 @@ public class LcLedgerService implements TradeLedger {
                                 + " (credit amount " + sw(lc.getAmount()) + ", 39A tolerance +" + lc.getTolerancePlus() + "/-" + lc.getToleranceMinus() + "% => max " + sw(maxAmount(lc))
                                 + ", utilised " + sw(z(lc.getUtilised())) + ", under examination " + sw(pendingPresented(lc)) + ")");
                     boolean prior = items.findByLcIdOrderByIdAsc(lc.getId()).stream().anyMatch(p -> "PRESENTATION".equals(p.getKind()) && !"REFUSED".equals(p.getStatus()));
+                    // 43P is partial shipments. The MT carries no shipment documents, so a second drawing or a drawing
+                    // below the minimum full amount is the simulator's proxy for a partial drawing.
                     if ("NOT ALLOWED".equals(lc.getPartialShipments()) && (prior || amt.compareTo(minFullDrawing(lc)) < 0))
-                        errs.add("BIZ-L02 partial drawing not allowed (43P NOT ALLOWED): " + (prior ? "credit already drawn" : "amount " + sw(amt) + " is below the credit amount less tolerance " + sw(minFullDrawing(lc))));
+                        errs.add("BIZ-L02 partial drawing not allowed (43P NOT ALLOWED; no shipment documents in the MT, so a further drawing or an amount below the minimum full drawing is treated as partial): "
+                                + (prior ? "credit already drawn" : "amount " + sw(amt) + " is below the credit amount less tolerance " + sw(minFullDrawing(lc))));
                 }
                 if (!errs.isEmpty()) return null;
                 LcAmendment pend = pendingAmendment(lc);
@@ -563,6 +572,8 @@ public class LcLedgerService implements TradeLedger {
                     p.setPresenterBic(sender);
                     p.setAddresseeBic(receiver);
                     p.setPresentedOn(today);
+                    p.setMaturityDate(maturityOf(v));
+                    p.setNominatedBankPaid(a == A.PRESENTATION && "f32A".equals(key));
                     p.setUtilisationBooked(false);
                     if (v.get("f77J") != null) p.setDiscrepancies(trunc(flat(v.get("f77J")), 2000));
                     p.setMessageId(rec.getId());
@@ -574,7 +585,10 @@ public class LcLedgerService implements TradeLedger {
                             pm.getShortType() + " presentation " + pref + " " + lc.getCurrency() + " " + sw(amt) + " by " + sender
                                     + (a == A.DISCREPANCY ? " with discrepancies: " + p.getDiscrepancies() : " (" + p.getDrawingType() + ")")
                                     + (pend != null ? "; NOTE amendment " + pend.getSeqNo() + " still pending (UCP 600 art. 10(c): the presentation indicates acceptance or rejection)" : "")
-                                    + "; examination deadline " + plusBankingDays(today, 5) + " (UCP 600 art. 14(b), 5 banking days)");
+                                    + (p.getMaturityDate() != null ? "; maturity " + p.getMaturityDate() : "")
+                                    + (Boolean.TRUE.equals(p.getNominatedBankPaid()) ? "; nominated bank has paid/negotiated (32A)" : "")
+                                    + (p.getMaturityDate() == null && "ACCEPTED/DEFERRED".equals(p.getDrawingType()) ? "; deferred/acceptance drawing, maturity not stated (put /MATURITY/YYMMDD in 72Z)" : "")
+                                    + "; examination deadline " + calendar.plus(today, 5) + " (UCP 600 art. 14(b), 5 banking days)");
                     out.put("lc_presentationStatus", p.getStatus());
                 };
             }
@@ -594,7 +608,7 @@ public class LcLedgerService implements TradeLedger {
                 switch (a) {
                     case REFUSAL -> {
                         currency(lc, Facts.mtCurrency(v.get("f32A"), true), errs);
-                        LocalDate deadline = plusBankingDays(it.getPresentedOn(), 5);
+                        LocalDate deadline = calendar.plus(it.getPresentedOn(), 5);
                         if (today.isAfter(deadline))
                             errs.add("BIZ-L06 refusal given later than 5 banking days after presentation (presented " + it.getPresentedOn() + ", deadline " + deadline + ", business date " + today
                                     + ") - the issuing bank is precluded from claiming non-compliance (UCP 600 art. 14(b)/16(f))");
@@ -615,7 +629,12 @@ public class LcLedgerService implements TradeLedger {
                     switch (a) {
                         case AUTHORISATION -> {
                             String code = firstLine(v.get("f23"));
-                            if ("ACCEPT".equals(code)) { it.setStatus("ACCEPTED"); lc.setMilestone("ACCEPTED"); }
+                            if ("ACCEPT".equals(code)) {
+                                it.setStatus("ACCEPTED");
+                                lc.setMilestone("ACCEPTED");
+                                LocalDate mat = maturityOf(v);
+                                if (mat != null) it.setMaturityDate(mat);
+                            }
                             else if ("REMITTED".equals(code) || "DEBIT".equals(code)) { it.setStatus("PAID"); it.setPaidAmount(it.getAmount()); lc.setMilestone("PAID"); }
                             else { it.setStatus("AUTHORISED"); lc.setMilestone("AUTHORISED"); }
                             book(lc, it, rec, "MT752 " + code);
@@ -710,6 +729,7 @@ public class LcLedgerService implements TradeLedger {
                     p.setDrawingType("CLAIM");
                     p.setCurrency(lc.getCurrency());
                     p.setAmount(amt);
+                    p.setPrincipalAmount(Facts.mtAmount(v.get("f32B")));
                     p.setStatus("CLAIMED");
                     p.setPresenterBic(sender);
                     p.setAddresseeBic(receiver);
@@ -743,11 +763,11 @@ public class LcLedgerService implements TradeLedger {
                 };
             }
             case SETTLEMENT -> {
-                BigDecimal amt = Facts.mtAmount(v.get("f32A"));
-                currency(lc, Facts.mtCurrency(v.get("f32A"), true), errs);
+                BigDecimal amt = settlementAmount(v);
+                currency(lc, settlementCurrency(v), errs);
                 if (it == null) {
                     if (!errs.isEmpty()) return null;
-                    return () -> { save(lc, rec); ts.event(K, lc.getId(), lc.getRef(), "SETTLEMENT", from, lc.getStatus(), rec, pm.getShortType() + " " + v.get("f32A") + " linked to the credit (no presentation reference in :21:)"); };
+                    return () -> { save(lc, rec); ts.event(K, lc.getId(), lc.getRef(), "SETTLEMENT", from, lc.getStatus(), rec, pm.getShortType() + " " + sw(amt) + " linked to the credit (no presentation or claim reference)"); };
                 }
                 if (!sender.equals(it.getAddresseeBic()) && !sr.contains("ISSUER")) errs.add("BIZ-R03 " + sender + " is not the bank liable for " + it.getPresentationRef() + " (" + it.getAddresseeBic() + ")");
                 if (!receiver.equals(it.getPresenterBic())) errs.add("BIZ-R05 " + it.getPresentationRef() + " was presented/claimed by " + it.getPresenterBic() + ", not by " + receiver);
@@ -765,8 +785,7 @@ public class LcLedgerService implements TradeLedger {
                         it.setPaidAmount(amt);
                         it.setResolutionMessageId(rec.getId());
                         it.setResolvedAt(Instant.now());
-                        List<LcPresentation> pres = items.findByLcIdOrderByIdAsc(lc.getId()).stream().filter(p -> "PRESENTATION".equals(p.getKind()) && it.getPresenterBic().equals(p.getPresenterBic()) && !"REFUSED".equals(p.getStatus())).toList();
-                        if (pres.isEmpty()) book(lc, it, rec, "reimbursement claim paid (no presentation seen by the simulator)");
+                        bookClaim(lc, it, v, rec);
                         items.save(it);
                         lc.setMilestone("REIMBURSED");
                         save(lc, rec);
@@ -784,7 +803,8 @@ public class LcLedgerService implements TradeLedger {
                         items.save(it);
                         lc.setMilestone("PAID");
                         save(lc, rec);
-                        ts.event(K, lc.getId(), lc.getRef(), "PAID", from, lc.getStatus(), rec, "presentation " + it.getPresentationRef() + " settled by " + pm.getShortType() + " " + lc.getCurrency() + " " + sw(amt));
+                        String early = it.getMaturityDate() != null && today.isBefore(it.getMaturityDate()) ? " (before recorded maturity " + it.getMaturityDate() + ")" : "";
+                        ts.event(K, lc.getId(), lc.getRef(), "PAID", from, lc.getStatus(), rec, "presentation " + it.getPresentationRef() + " settled by " + pm.getShortType() + " " + lc.getCurrency() + " " + sw(amt) + early);
                     }
                 };
             }
@@ -807,10 +827,83 @@ public class LcLedgerService implements TradeLedger {
     }
 
     private void book(DocCredit lc, LcPresentation it, MessageRecord rec, String why) {
+        bookAmount(lc, it, z(it.getAmount()), rec, why);
+    }
+
+    private void bookAmount(DocCredit lc, LcPresentation it, BigDecimal amt, MessageRecord rec, String why) {
         if (Boolean.TRUE.equals(it.getUtilisationBooked())) return;
         it.setUtilisationBooked(true);
-        lc.setUtilised(z(lc.getUtilised()).add(z(it.getAmount())));
-        ts.movement(K, lc.getId(), "UTILISATION", lc.getCurrency(), it.getAmount(), maxAmount(lc).subtract(z(lc.getUtilised())), rec, it.getPresentationRef(), why);
+        lc.setUtilised(z(lc.getUtilised()).add(z(amt)));
+        ts.movement(K, lc.getId(), "UTILISATION", lc.getCurrency(), amt, maxAmount(lc).subtract(z(lc.getUtilised())), rec, it.getPresentationRef(), why);
+    }
+
+    /**
+     * Tie an MT742 to one presentation. An explicit /PRESREF/ (or the same reference) wins.
+     * Otherwise a single same-presenter presentation for the same principal is used.
+     * Another presentation from the same bank does not, by itself, decide this claim's exposure.
+     * Exposure booked from the claim alone is field 32B (principal), not 34a (principal + charges).
+     */
+    private void bookClaim(DocCredit lc, LcPresentation claim, Map<String, String> v, MessageRecord rec) {
+        LcPresentation linked = linkedPresentation(lc, claim, v);
+        BigDecimal principal = claim.getPrincipalAmount() != null ? claim.getPrincipalAmount() : claim.getAmount();
+        if (linked != null) {
+            claim.setLinkedPresentationRef(linked.getPresentationRef());
+            linked.setLinkedClaimRef(claim.getPresentationRef());
+            if (!Boolean.TRUE.equals(linked.getUtilisationBooked()))
+                bookAmount(lc, linked, z(linked.getAmount()), rec, "reimbursement of linked presentation " + linked.getPresentationRef());
+            items.save(linked);
+        } else {
+            bookAmount(lc, claim, z(principal), rec, "reimbursement claim paid with no linked presentation; utilisation is principal 32B");
+        }
+    }
+
+    private LcPresentation linkedPresentation(DocCredit lc, LcPresentation claim, Map<String, String> v) {
+        List<LcPresentation> all = items.findByLcIdOrderByIdAsc(lc.getId());
+        String explicit = presRef(v.get("f72Z"));
+        if (explicit == null) explicit = presRef(v.get("f77"));
+        if (explicit != null) {
+            String ref = explicit;
+            return all.stream().filter(p -> "PRESENTATION".equals(p.getKind()) && ref.equals(p.getPresentationRef())).findFirst().orElse(null);
+        }
+        Optional<LcPresentation> sameRef = all.stream().filter(p -> "PRESENTATION".equals(p.getKind()) && claim.getPresentationRef().equals(p.getPresentationRef())).findFirst();
+        if (sameRef.isPresent()) return sameRef.get();
+        BigDecimal principal = claim.getPrincipalAmount() != null ? claim.getPrincipalAmount() : claim.getAmount();
+        List<LcPresentation> cands = all.stream().filter(p -> "PRESENTATION".equals(p.getKind())
+                && claim.getPresenterBic().equals(p.getPresenterBic())
+                && !"REFUSED".equals(p.getStatus())
+                && p.getLinkedClaimRef() == null
+                && principal != null && z(p.getAmount()).compareTo(principal) == 0).toList();
+        return cands.size() == 1 ? cands.get(0) : null;
+    }
+
+    private static final Pattern PRESREF = Pattern.compile("/(?:PRESREF|PRESENTATION)/([A-Za-z0-9]{1,16})");
+
+    private static String presRef(String text) {
+        if (text == null) return null;
+        Matcher m = PRESREF.matcher(text);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private static LocalDate maturityOf(Map<String, String> v) {
+        for (String key : List.of("f72Z", "f77", "f79Z")) {
+            String s = v.get(key);
+            if (s == null) continue;
+            Matcher m = Pattern.compile("/MATURITY/(\\d{6})").matcher(s);
+            if (m.find()) return Facts.mtDate(m.group(1));
+        }
+        return null;
+    }
+
+    private static BigDecimal settlementAmount(Map<String, String> v) {
+        if (v.get("f32A") != null) return Facts.mtAmount(v.get("f32A"));
+        if (v.get("mx_amount") != null) return Facts.dec(v.get("mx_amount"));
+        return Facts.dec(v.get("amountIso"));
+    }
+
+    private static String settlementCurrency(Map<String, String> v) {
+        if (v.get("f32A") != null) return Facts.mtCurrency(v.get("f32A"), true);
+        if (v.get("mx_currency") != null) return v.get("mx_currency");
+        return v.get("currency");
     }
 
     private void applyAmendment(DocCredit lc, LcAmendment am, MessageRecord rec) {

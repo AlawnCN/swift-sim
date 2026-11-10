@@ -1,0 +1,24 @@
+<!-- pacs.009 CORE: bank-to-bank settlement (CBPR+ equivalent of MT202). EndToEndId = trade reference (:21:). -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.009.001.08">
+  <FICdtTrf>
+    <GrpHdr>
+      <MsgId>${newRef}</MsgId>
+      <CreDtTm>${nowUtc}</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf><SttlmMtd>INDA</SttlmMtd></SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <InstrId>${newRef}</InstrId>
+        <EndToEndId>${e2e|lc_presRef|f20|ref}</EndToEndId>
+        <UETR>${uetr}</UETR>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="${currency}">${amountIso}</IntrBkSttlmAmt>
+      <IntrBkSttlmDt>${todayIso}</IntrBkSttlmDt>
+      <InstgAgt><FinInstnId><BICFI>${fromBic}</BICFI></FinInstnId></InstgAgt>
+      <InstdAgt><FinInstnId><BICFI>${toBic}</BICFI></FinInstnId></InstdAgt>
+      <Dbtr><FinInstnId><BICFI>${fromBic}</BICFI></FinInstnId></Dbtr>
+      <Cdtr><FinInstnId><BICFI>${toBic}</BICFI></FinInstnId></Cdtr>
+    </CdtTrfTxInf>
+  </FICdtTrf>
+</Document>

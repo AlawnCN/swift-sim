@@ -4,7 +4,7 @@
  "products": {
   "UNDERTAKING": {
    "name": "Demand guarantee / standby LC (MT760 family, tsrv.*)", "name_zh": "保函 / 备用信用证",
-   "messages": ["MT760","MT761","MT765","MT767","MT768","MT769","MT775","MT785","MT786","MT787","MT759","tsrv.001-tsrv.019"],
+   "messages": ["MT760","MT761","MT765","MT767","MT768","MT769","MT775","MT785","MT786","MT787","MT759","MT792","MT796","tsrv.001-tsrv.019","pacs.008","pacs.009"],
    "terminal": ["RELEASED","EXPIRED","TERMINATED"],
    "statuses": {
     "APPLIED": {"zh":"已申请（开立申请，MT798/tsrv.001 未开立）","expectedNext":["MT760 issuance"]},
@@ -12,9 +12,12 @@
     "ADVISED": {"zh":"已通知受益人","expectedNext":["MT767 amendment","MT765 demand","MT769 reduction/release","expiry"]},
     "AMENDED": {"zh":"已修改生效","expectedNext":["MT765 demand","MT767 further amendment","MT769"]},
     "AMENDMENT_PENDING": {"zh":"修改待受益人接受/拒绝","expectedNext":["MT787 amendment response (ACCP/RJCT) or MT768 ack"]},
-    "DEMAND_RECEIVED": {"zh":"收到索赔，待付款/拒付","expectedNext":["MT786 refusal","MT202/MT103 payment + MT769 reduction","MT785 non-extension"]},
+    "REQUESTED": {"zh":"反担保项下当地保函已请求、尚未开立","expectedNext":["MT760 ISSU of the local undertaking"]},
+    "DEMAND_RECEIVED": {"zh":"收到索赔，待受理/付款/拒付","expectedNext":["MT786 refusal","tsrv.019 DMND/ACCP then settlement","MT202/MT103 or pacs.009/pacs.008","MT785 non-extension"]},
+    "DEMAND_ACCEPTED": {"zh":"索赔已受理，待资金报文","expectedNext":["MT202/MT103 or pacs.009 CORE/COV or pacs.008"]},
+    "PARTIALLY_PAID": {"zh":"索赔部分付款，余额仍可付","expectedNext":["further MT202/pacs settlement for the unpaid balance"]},
     "EXTEND_OR_PAY_PENDING": {"zh":"展期或付款请求待处理","expectedNext":["MT767 extension","payment (MT769)","MT786 refusal"]},
-    "PAID": {"zh":"已付款（全部或部分）","expectedNext":["MT769 reduction/release"]},
+    "PAID": {"zh":"索赔已全额付款","expectedNext":["MT769 reduction/release"]},
     "REDUCED": {"zh":"已减额","expectedNext":["further demand","MT769 release"]},
     "EXTENDED": {"zh":"已展期","expectedNext":["MT765 demand","expiry"]},
     "REFUSED": {"zh":"索赔被拒","expectedNext":["new demand","expiry"]},
@@ -25,7 +28,9 @@
    "transitions": [
     ["-","MT760 / tsrv.001","ISSUED"],["ISSUED","MT768 ACK by non-issuer","ADVISED"],["*","MT767 amendment","AMENDMENT_PENDING"],
     ["AMENDMENT_PENDING","MT787 ACCP","AMENDED"],["AMENDMENT_PENDING","MT787 RJCT","previous"],["*","MT765 demand","DEMAND_RECEIVED / EXTEND_OR_PAY_PENDING"],
-    ["DEMAND_RECEIVED","payment","PAID / REDUCED / RELEASED"],["DEMAND_RECEIVED","MT786 refusal","REFUSED"],["EXTEND_OR_PAY_PENDING","MT767 new expiry","EXTENDED"],
+    ["DEMAND_RECEIVED","tsrv.019 DMND/ACCP","DEMAND_ACCEPTED"],["DEMAND_RECEIVED","payment less than the demand","PARTIALLY_PAID"],
+    ["DEMAND_ACCEPTED","MT202/MT103/pacs.008/pacs.009","PAID or PARTIALLY_PAID"],["PARTIALLY_PAID","remaining settlement","PAID"],
+    ["DEMAND_RECEIVED","MT786 refusal","REFUSED"],["EXTEND_OR_PAY_PENDING","MT767 new expiry","EXTENDED"],
     ["*","MT769 reduction to 0 / release","RELEASED"],["*","expiry date passed (sweep, business date)","EXPIRED"]
    ]
   },
@@ -44,7 +49,7 @@
     "AMENDMENT_PENDING": {"zh":"修改待受益人接受","expectedNext":["MT730 with acceptance/refusal"]},
     "DOCS_PRESENTED": {"zh":"已交单待审单（5 个银行工作日内）","expectedNext":["MT752 authorisation","MT734 refusal","MT756 reimbursement/payment"]},
     "DISCREPANT": {"zh":"有不符点","expectedNext":["MT752 (waiver accepted)","MT734 refusal","MT750 advice of discrepancy response"]},
-    "ACCEPTED": {"zh":"已承兑（远期）","expectedNext":["payment at maturity (MT756/MT202)"]},
+    "ACCEPTED": {"zh":"已承兑（远期）；到期日在交单 maturityDate（72Z /MATURITY/YYMMDD）","expectedNext":["payment at maturity (MT756/MT202 or pacs.009/pacs.008)"]},
     "PAID": {"zh":"已付款","expectedNext":["further drawings while available > 0","expiry"]},
     "REFUSED": {"zh":"已拒付","expectedNext":["re-presentation","return documents"]},
     "REIMBURSED": {"zh":"已偿付","expectedNext":[]},

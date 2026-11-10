@@ -51,6 +51,8 @@ public class DocCollection {
     private Boolean tracerPending;
     private Integer tracerCount;
     private Boolean returnRequested;
+    /** URC 522 art. 19: documentary partial payment only when /COLLINST/ carries /PARTIAL/ (not NO) */
+    private Boolean partialPaymentAuthorised;
     private String milestone;
     private String status;
     private Instant createdAt;

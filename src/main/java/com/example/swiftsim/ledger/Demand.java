@@ -23,7 +23,7 @@ public class Demand {
     @Column(precision = 20, scale = 3)
     private BigDecimal amount;
     private LocalDate requestedExpiry;
-    /** RECEIVED, PAID, REFUSED, EXTENDED, WITHDRAWN */
+    /** RECEIVED, ACCEPTED (awaiting settlement), PARTIALLY_PAID, PAID, REFUSED, EXTENDED, WITHDRAWN */
     private String status;
     private String presenterBic;
     private Long messageId;

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTDKEN0XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>PACS9CORE0001</BizMsgIdr>
+  <MsgDefIdr>pacs.009.001.08</MsgDefIdr>
+  <BizSvc>swift.cbprplus.02</BizSvc>
+  <CreDt>2026-11-10T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.009.001.08">
+  <FICdtTrf>
+    <GrpHdr>
+      <MsgId>PACS9CORE0001</MsgId>
+      <CreDtTm>2026-11-10T08:00:00Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf><SttlmMtd>INDA</SttlmMtd></SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <InstrId>PACS9CORE0001</InstrId>
+        <EndToEndId>KEGTEE2026000001</EndToEndId>
+        <UETR>f47ac10b-58cc-4372-a567-0e02b2c3d479</UETR>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="USD">25000.00</IntrBkSttlmAmt>
+      <IntrBkSttlmDt>2026-11-10</IntrBkSttlmDt>
+      <InstgAgt><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></InstgAgt>
+      <InstdAgt><FinInstnId><BICFI>TSTDKEN0XXX</BICFI></FinInstnId></InstdAgt>
+      <Dbtr><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></Dbtr>
+      <Cdtr><FinInstnId><BICFI>TSTDKEN0XXX</BICFI></FinInstnId></Cdtr>
+    </CdtTrfTxInf>
+  </FICdtTrf>
+</Document>
+</RequestPayload>

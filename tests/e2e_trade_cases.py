@@ -220,8 +220,10 @@ def csample(name, ref, extra=None):
     while d is None and time.time() - t0 < 6: time.sleep(0.5); d = cod(ref)
     a = "USD" + amt(d["amount"])
     return sample(name, {"KECO2026000101": ref, "USD80000,00": a, **(extra or {})})
-def collinst(ref, typ="DP", amount="80000,00", tenor="AT SIGHT", **kw):
+def collinst(ref, typ="DP", amount="80000,00", tenor="AT SIGHT", partial=False, **kw):
     s = sample("mt499-coll-instruction-dp.fin", {"KECO2026000001": ref, "/COLLINST/DP": f"/COLLINST/{typ}", "USD80000,00": f"USD{amount}", "/TENOR/AT SIGHT": f"/TENOR/{tenor}"})
+    if partial:
+        s = s.replace("/CHARGES/DRAWEE", "/PARTIAL/YES\n/CHARGES/DRAWEE")
     return lambda: post(s, **kw)
 C1, C2, C3, C4, C5 = (R(t) for t in ["KC1", "KC2", "KC3", "KC4", "KC5"])
 check("I1 SUT D/P instruction -> MT410 + MT400 + MT202", collinst(C1), [("MT410", f":21:{C1}"), ("MT400", f":21:{C1}"), ("MT202", f":21:{C1}")], wait=10)
@@ -234,7 +236,7 @@ check("I5 instruction, non-payment -> MT410 + MT416", collinst(C3, scenario="col
 tcheck("I5 collection NON_PAID", cod, C3, lambda d: d["status"] == "NON_PAID")
 check("I6 SUT MT430 /RETURN/ -> MT422 /RETURNED/", lambda: post(sample("mt430-coll-return.fin", {"KECO2026000001": C3})), [("MT422", "/RETURNED/")])
 tcheck("I6 collection RETURNED", cod, C3, lambda d: d["status"] == "RETURNED")
-check("I7 instruction, partial payment -> MT400 half", collinst(C4, scenario="coll-partial"), [("MT410", None), ("MT400", ":32B:USD40000,00"), ("MT202", ":32A:")], wait=9)
+check("I7 instruction, partial payment -> MT400 half", collinst(C4, scenario="coll-partial", partial=True), [("MT410", None), ("MT400", ":32B:USD40000,00"), ("MT202", ":32A:")], wait=9)
 tcheck("I7 collection PARTIALLY_PAID 40000 outstanding", cod, C4, lambda d: d["status"] == "PARTIALLY_PAID" and d["outstanding"] == 40000)
 check("I8 instruction, collecting bank silent", collinst(C5, scenario="coll-no-response"), [], forbid=("MT410",), wait=3)
 check("I9 SUT MT420 tracer -> MT422 fate", lambda: post(sample("mt420-coll-tracer.fin", {"KECO2026000001": C5})), [("MT422", f":21:{C5}")])
@@ -282,6 +284,23 @@ tcheck("I24 C6 PAID", cod, C6, lambda d: d["status"] == "PAID")
 req("POST", "/api/participants/COLLECTING_BANK/review-mode", {"enabled": False})
 c, lst = req("GET", "/api/collections?status=PAID")
 record("I25 GET /api/collections?status=PAID", c == 200 and C1 in {x["ref"] for x in lst}, len(lst))
+C7 = R("KC7")
+check("I26 partial payment not authorised -> no auto reply", collinst(C7, scenario="coll-no-response"), [], forbid=("MT410",), wait=3)
+_half = []
+check("I26 MT400 half submitted to SUT", lambda: post(
+    f":20:{R('HP')}\n:21:{C7}\n:32B:USD40000,00\n:33A:{TODAY:%y%m%d}USD40000,00",
+    **{"from": "COLLECTING_BANK", "to": "SUT_BANK", "mtType": "400"}), [], holder=_half)
+def _k13():
+    mid = (_half[0][1] or {}).get("id") if _half else None
+    deadline = time.time() + 6
+    while time.time() < deadline and mid:
+        _, m = req("GET", f"/api/messages/{mid}")
+        reason = (m or {}).get("businessReason") or ""
+        if "BIZ-K13" in reason:
+            return reason
+        time.sleep(0.4)
+    return (m or {}).get("businessReason") if mid else "no message"
+record("I26 MT400 half without /PARTIAL/ is BIZ-K13 (SUT should reject)", "BIZ-K13" in (_why := _k13()), _why)
 
 # ================================================================ J. delayed chasers (fireWhen)
 print("--- J. delayed chasers")

@@ -6,7 +6,7 @@ description: Connect to the SWIFT trade-finance simulator (swift-sim) AI API to 
 # swift-sim verifier skill
 
 ## When to use
-- "Check whether guarantee / LC / collection X is consistent", "why was message #N rejected", "is this MT760/MT700/tsrv.001 correct before we send it",
+- "Check whether guarantee / LC / collection X is consistent", "why was message #N rejected", "is this MT760/MT700/tsrv.001/pacs.009 correct before we send it",
   "what happened since the last check", "reply as bank B to the pending demand".
 - Not for: changing simulator configuration, resetting data, sending traffic on behalf of the system under test (SUT).
 

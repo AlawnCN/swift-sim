@@ -20,6 +20,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
 
 import java.nio.charset.StandardCharsets;
@@ -49,6 +51,15 @@ public class GatewayService {
     private final ApplicationEventPublisher events;
     private final SessionService sessions;
     private final LedgerService ledger;
+    private final PlatformTransactionManager txm;
+    /** Held across the ledger commit and the DELIVERED update so a restart cannot replay a half-applied message. */
+    private final Object deliveryLock = new Object();
+
+    private TransactionTemplate tx() {
+        return new TransactionTemplate(txm);
+    }
+
+    private record DeliveryCommit(MessageRecord rec, Participant recv, LedgerService.Outcome out, LocalDateTime deliveredAt) {}
 
     @Value("${sim.data-dir:./data}")
     private String dataDir;
@@ -241,13 +252,27 @@ public class GatewayService {
 
     private void deliver(Long id, ParsedMessage pm, SubmitOptions o) {
         try {
-            MessageRecord rec = repo.findById(id).orElseThrow();
-            if (!"ACK".equals(rec.getStatus())) return; // already delivered (e.g. re-delivery after restart)
-            Participant recv = cfg.byBic(rec.getReceiverBic()).orElseThrow();
+            DeliveryCommit commit;
+            synchronized (deliveryLock) {
+                // Ledger apply and the DELIVERED status commit together. A crash before commit leaves the
+                // message ACK, so restart replays it once. A crash after commit does not replay the ledger.
+                commit = tx().execute(s -> deliverInTransaction(id, pm, o));
+            }
+            if (commit == null) return;
+            finishDelivery(commit, pm, o);
+        } catch (Exception e) {
+            log.error("delivery of {} failed", id, e);
+        }
+    }
+
+    private DeliveryCommit deliverInTransaction(Long id, ParsedMessage pm, SubmitOptions o) {
+        MessageRecord rec = repo.findById(id).orElseThrow();
+        if (!"ACK".equals(rec.getStatus())) return null;
+        Participant recv = cfg.byBic(rec.getReceiverBic()).orElseThrow();
+        LocalDateTime now = LocalDateTime.now();
+        boolean replay = ledger.alreadyApplied(id);
+        if (rec.getDeliveredRaw() == null) {
             LtSession s = sessions.nextOsn(recv.bic11());
-            LocalDateTime now = LocalDateTime.now();
-            rec.setStatus("DELIVERED");
-            rec.setUpdatedAt(Instant.now());
             if ("MT".equals(rec.getFormat())) {
                 rec.setOsn(s.getLastOsn());
                 rec.setMor(now.format(D6) + Bics.toLt(recv.bic11(), 'A') + String.format("%04d%06d", s.getSessionNo(), s.getLastOsn()));
@@ -255,44 +280,57 @@ public class GatewayService {
             } else {
                 rec.setDeliveredRaw(rec.getRaw());
             }
-            // business level: receiver's application checks the message against the undertaking ledger
-            LedgerService.Outcome out = ledger.process(rec, pm, recv.isSut(), o.isBusinessReject());
+        }
+        rec.setStatus("DELIVERED");
+        rec.setUpdatedAt(Instant.now());
+        LedgerService.Outcome out;
+        if (replay) {
+            out = new LedgerService.Outcome("DUPLICATE_IGNORED", List.of(), rec.getUndertakingRef(), null, null, Map.of("ldg_outcome", "DUPLICATE_IGNORED"));
+            if (rec.getBusinessStatus() == null) rec.setBusinessStatus("DUPLICATE_IGNORED");
+        } else {
+            out = ledger.process(rec, pm, recv.isSut(), o.isBusinessReject());
             rec.setBusinessStatus(out.status());
             rec.setBusinessReason(out.errors().isEmpty() ? null : trunc(String.join("\n", out.errors()), 4000));
             if (out.ref() != null && ledger.existsAny(out.ref())) rec.setUndertakingRef(trunc(out.ref(), 64));
-            repo.save(rec);
-            rec.setOutboxFile(writeOutbox(rec, recv.bic11()));
-            rec.setWebhookStatus(webhook(recv, rec));
-            repo.save(rec);
-            Optional<Participant> sender = cfg.byBic(rec.getSenderBic());
-            boolean requested = "MT".equals(rec.getFormat()) && Set.of("2", "3").contains(pm.getVars().getOrDefault("_monitoring", ""));
-            if (sender.isPresent() && (requested || sender.get().isSut() && sender.get().isDeliveryNotifications())) {
-                MessageRecord dlv = new MessageRecord();
-                dlv.setCreatedAt(Instant.now());
-                dlv.setUpdatedAt(dlv.getCreatedAt());
-                dlv.setDirection("SYS");
-                dlv.setChannel("GATEWAY");
-                dlv.setFormat("SYS");
-                dlv.setMsgType("DLV");
-                dlv.setSenderBic("SIMGATEWAY");
-                dlv.setReceiverBic(rec.getSenderBic());
-                dlv.setTxRef(rec.getTxRef());
-                dlv.setInReplyTo(rec.getId());
-                dlv.setStatus("SENT");
-                dlv.setMir(rec.getMir());
-                dlv.setMor(rec.getMor());
-                dlv.setRaw(dlvText(rec, now));
-                dlv.setDeliveredRaw(dlv.getRaw());
-                repo.save(dlv);
-                if (sender.get().isSut()) {
-                    writeOutbox(dlv, sender.get().bic11());
-                    webhook(sender.get(), dlv);
-                }
-            }
-            if (!recv.isSut()) events.publishEvent(new DeliveredEvent(rec, pm, o, out));
-        } catch (Exception e) {
-            log.error("delivery of {} failed", id, e);
         }
+        repo.save(rec);
+        return new DeliveryCommit(rec, recv, out, now);
+    }
+
+    private void finishDelivery(DeliveryCommit commit, ParsedMessage pm, SubmitOptions o) {
+        MessageRecord rec = commit.rec();
+        Participant recv = commit.recv();
+        LedgerService.Outcome out = commit.out();
+        LocalDateTime now = commit.deliveredAt();
+        rec.setOutboxFile(writeOutbox(rec, recv.bic11()));
+        rec.setWebhookStatus(webhook(recv, rec));
+        repo.save(rec);
+        Optional<Participant> sender = cfg.byBic(rec.getSenderBic());
+        boolean requested = "MT".equals(rec.getFormat()) && Set.of("2", "3").contains(pm.getVars().getOrDefault("_monitoring", ""));
+        if (sender.isPresent() && (requested || sender.get().isSut() && sender.get().isDeliveryNotifications())) {
+            MessageRecord dlv = new MessageRecord();
+            dlv.setCreatedAt(Instant.now());
+            dlv.setUpdatedAt(dlv.getCreatedAt());
+            dlv.setDirection("SYS");
+            dlv.setChannel("GATEWAY");
+            dlv.setFormat("SYS");
+            dlv.setMsgType("DLV");
+            dlv.setSenderBic("SIMGATEWAY");
+            dlv.setReceiverBic(rec.getSenderBic());
+            dlv.setTxRef(rec.getTxRef());
+            dlv.setInReplyTo(rec.getId());
+            dlv.setStatus("SENT");
+            dlv.setMir(rec.getMir());
+            dlv.setMor(rec.getMor());
+            dlv.setRaw(dlvText(rec, now));
+            dlv.setDeliveredRaw(dlv.getRaw());
+            repo.save(dlv);
+            if (sender.get().isSut()) {
+                writeOutbox(dlv, sender.get().bic11());
+                webhook(sender.get(), dlv);
+            }
+        }
+        if (!recv.isSut() && !"DUPLICATE_IGNORED".equals(out.status())) events.publishEvent(new DeliveredEvent(rec, pm, o, out));
     }
 
     /** After a restart: deliver messages that were ACKed but not yet delivered. */

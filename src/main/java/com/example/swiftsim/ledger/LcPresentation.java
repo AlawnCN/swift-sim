@@ -27,6 +27,9 @@ public class LcPresentation {
     private String currency;
     @Column(precision = 20, scale = 3)
     private BigDecimal amount;
+    /** MT742 field 32B principal, when amount is the 34a total (principal + charges) */
+    @Column(precision = 20, scale = 3)
+    private BigDecimal principalAmount;
     @Column(precision = 20, scale = 3)
     private BigDecimal paidAmount;
     /** PRESENTED, DISCREPANT, AUTHORISED, ACCEPTED, REFUSED, DISCHARGED, PAID | CLAIMED, REIMBURSED, NON_CONFORMING */
@@ -36,6 +39,14 @@ public class LcPresentation {
     private String addresseeBic;
     private LocalDate presentedOn;
     private LocalDate maturityDate;
+    /** MT754 with 32A: the nominated bank has already paid or negotiated */
+    private Boolean nominatedBankPaid;
+    /** explicit /PRESREF/ or amount-matched presentation this claim settles */
+    @Column(length = 64)
+    private String linkedPresentationRef;
+    /** claim reference that settled this presentation, so a second claim is not tied to it */
+    @Column(length = 64)
+    private String linkedClaimRef;
     private Boolean utilisationBooked;
     @Column(length = 2000)
     private String discrepancies;

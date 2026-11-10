@@ -34,7 +34,11 @@ public class MxHandler {
     public static final Set<String> SUPPORTED = new LinkedHashSet<>(List.of(
             "tsrv.001.001.01", "tsrv.005.001.01", "tsrv.008.001.01", "tsrv.010.001.01", "tsrv.011.001.01",
             "tsrv.012.001.01", "tsrv.013.001.01", "tsrv.014.001.01", "tsrv.015.001.01", "tsrv.016.001.01",
-            "tsrv.017.001.01", "tsrv.019.001.01", "tsin.005.001.01", "admi.002.001.01"));
+            "tsrv.017.001.01", "tsrv.019.001.01", "tsin.005.001.01", "admi.002.001.01",
+            "pacs.008.001.08", "pacs.009.001.08"));
+    /** tsrv.019 StsCtgy values this simulator produces and accepts. External codes outside this set are rejected. */
+    public static final Set<String> STATUS_CATEGORIES = Set.of("ISSU", "DMND", "TERM", "NEXT", "APPL", "GENR");
+    private static final Set<String> PACS = Set.of("pacs.008.001.08", "pacs.009.001.08");
     private final Map<String, Schema> schemas = new ConcurrentHashMap<>();
 
     public static boolean looksLikeMx(String raw) {
@@ -117,7 +121,11 @@ public class MxHandler {
             pm.getErrors().add("SIM-X01 XML not well-formed: " + e.getMessage());
             return pm;
         }
-        Element doc = firstByLocalName(dom, "Document");
+        List<Element> docs = allByLocalName(dom, "Document");
+        if (docs.size() > 1) {
+            pm.getErrors().add("SIM-X08 message contains " + docs.size() + " <Document> elements; exactly one is required");
+        }
+        Element doc = docs.isEmpty() ? null : docs.get(0);
         if (doc == null || doc.getNamespaceURI() == null || !doc.getNamespaceURI().startsWith(NS_PREFIX)) {
             pm.getErrors().add("SIM-X02 no ISO 20022 <Document> element found (namespace " + NS_PREFIX + "...)");
             return pm;
@@ -138,7 +146,7 @@ public class MxHandler {
                     pm.getWarnings().add("AppHdr not validated: " + e.getMessage());
                 }
             } else {
-                pm.getWarnings().add("AppHdr namespace " + hns + " not XSD-validated (only head.001.001.02 bundled)");
+                pm.getErrors().add("SIM-X06 AppHdr namespace " + hns + " is not supported (only head.001.001.02)");
             }
             String pd = text(hdr, "PssblDplct");
             if ("true".equalsIgnoreCase(pd)) {
@@ -164,11 +172,15 @@ public class MxHandler {
             pm.getErrors().add("SIM-T02 MX " + msgId + " not supported (supported: " + SUPPORTED + ")");
             return pm;
         }
-        try {
-            List<String> errs = validate(msgId, toXml(doc));
-            errs.forEach(e -> pm.getErrors().add("SIM-X03 XSD " + msgId + ": " + e));
-        } catch (Exception e) {
-            pm.getErrors().add("SIM-X04 XSD validation failed: " + e.getMessage());
+        if (PACS.contains(msgId)) {
+            pacsStructure(doc, hdr, msgId, pm);
+        } else {
+            try {
+                List<String> errs = validate(msgId, toXml(doc));
+                errs.forEach(e -> pm.getErrors().add("SIM-X03 XSD " + msgId + ": " + e));
+            } catch (Exception e) {
+                pm.getErrors().add("SIM-X04 XSD validation failed: " + e.getMessage());
+            }
         }
         try {
             AbstractMX mx = AbstractMX.parse(raw.strip());
@@ -192,19 +204,28 @@ public class MxHandler {
                 if (c instanceof Element e && "Id".equals(e.getLocalName())) { demandId = e.getTextContent().trim(); break; }
         }
         if (demandId != null) { v.put("demandId", demandId); pm.setRelatedRef(demandId); }
-        Element amt = null;
         NodeList all = doc.getElementsByTagNameNS("*", "*");
         for (int i = 0; i < all.getLength(); i++) {
             Element e = (Element) all.item(i);
-            if (amt == null && e.hasAttribute("Ccy")) amt = e;
             if (e.getFirstChild() != null && e.getFirstChild() == e.getLastChild() && e.getFirstChild().getNodeType() == Node.TEXT_NODE)
                 v.putIfAbsent("x_" + e.getLocalName(), e.getTextContent().trim());
         }
+        facts(doc, v);
+        Element amt = businessAmount(doc, msgId, v);
         if (amt != null) {
-            v.put("currency", amt.getAttribute("Ccy"));
-            v.put("amountIso", amt.getTextContent().trim());
-            v.put("amount", amt.getTextContent().trim().replace('.', ','));
+            String ccy = amt.getAttribute("Ccy");
+            String iso = amt.getTextContent() == null ? "" : amt.getTextContent().trim();
+            v.put("currency", ccy);
+            v.put("amountIso", iso);
+            v.put("amount", iso.replace('.', ','));
+            v.put("mx_currency", ccy);
+            if (v.get("mx_amount") == null) v.put("mx_amount", iso);
+            String cerr = Iso4217.checkIso(ccy, iso);
+            if (cerr != null) pm.getErrors().add("SIM-F07 " + amt.getLocalName() + ": " + cerr);
         }
+        String cat = v.get("mx_statusCategory");
+        if (cat != null && !STATUS_CATEGORIES.contains(cat))
+            pm.getErrors().add("SIM-X07 StsCtgy '" + cat + "' is not in the simulator code set " + new TreeSet<>(STATUS_CATEGORIES));
         String issuerBic = text(firstByLocalName(doc, "Issr"), "AnyBIC");
         if (issuerBic != null) v.put("issuerBic", issuerBic);
         String tp = text(doc, "UdrtkgDmndDtls", "Tp");
@@ -223,8 +244,101 @@ public class MxHandler {
         }
         String nm = text(doc, "Nm");
         if (nm != null) v.put("formOfUndertaking", nm);
-        facts(doc, v);
+        if (PACS.contains(msgId)) applyPacsRefs(doc, hdr, msgId, pm);
         return pm;
+    }
+
+    static List<Element> allByLocalName(Node root, String name) {
+        List<Element> out = new ArrayList<>();
+        if (root == null) return out;
+        NodeList all = root instanceof Document d ? d.getElementsByTagNameNS("*", name) : ((Element) root).getElementsByTagNameNS("*", name);
+        for (int i = 0; i < all.getLength(); i++) out.add((Element) all.item(i));
+        return out;
+    }
+
+    /**
+     * The amount that changes the ledger, by message type. Not "the first element that has Ccy"
+     * (a charges or underlying-customer amount must not win over the undertaking or settlement amount).
+     */
+    static Element businessAmount(Element doc, String msgId, Map<String, String> v) {
+        if (msgId.startsWith("pacs.008") || msgId.startsWith("pacs.009")) {
+            Element sttl = firstByLocalName(doc, "IntrBkSttlmAmt");
+            if (sttl != null) return sttl;
+        }
+        if (v.get("mx_demandAmount") != null) {
+            Element dd = firstByLocalName(doc, "UdrtkgDmndDtls");
+            Element da = dd == null ? null : firstByLocalName(dd, "DmndAmt");
+            Element a = da == null ? null : firstByLocalName(da, "Amt");
+            if (a == null) {
+                Element dm = firstByLocalName(doc, "DmndDtls");
+                a = dm == null ? null : child(dm, "Amt");
+            }
+            if (a != null) return a;
+        }
+        if (v.get("mx_increase") != null) return firstByLocalName(doc, "IncrAmt");
+        if (v.get("mx_decrease") != null) return firstByLocalName(doc, "DecrAmt");
+        Element ua = firstByLocalName(doc, "UdrtkgAmt");
+        Element amt = ua == null ? null : firstByLocalName(ua, "Amt");
+        if (amt != null) return amt;
+        return firstByLocalName(doc, "Amt");
+    }
+
+    private static void pacsStructure(Element doc, Element hdr, String msgId, ParsedMessage pm) {
+        boolean cov = firstByLocalName(doc, "UndrlygCstmrCdtTrf") != null;
+        boolean p8 = msgId.startsWith("pacs.008");
+        pm.getVars().put("settlementKind", p8 ? "CUSTOMER" : cov ? "COV" : "CORE");
+        String biz = hdr == null ? null : text(hdr, "BizSvc");
+        if (biz != null) pm.getVars().put("bizSvc", biz);
+        String bizL = biz == null ? "" : biz.toLowerCase();
+        if (!p8 && bizL.contains("cov") && !cov)
+            pm.getErrors().add("SIM-X10 pacs.009 BizSvc indicates COV but UndrlygCstmrCdtTrf is absent");
+        if (!p8 && (bizL.contains(".core") || bizL.endsWith("core")) && cov)
+            pm.getErrors().add("SIM-X10 pacs.009 BizSvc indicates CORE but UndrlygCstmrCdtTrf is present");
+        requireText(doc, pm, "MsgId");
+        requireText(doc, pm, "CreDtTm");
+        requireText(doc, pm, "NbOfTxs");
+        String e2e = text(doc, "EndToEndId");
+        if (e2e == null || e2e.isBlank()) pm.getErrors().add("SIM-X10 " + msgId + ": EndToEndId is required (it correlates the settlement to the trade reference)");
+        Element st = firstByLocalName(doc, "IntrBkSttlmAmt");
+        if (st == null || !st.hasAttribute("Ccy") || st.getTextContent() == null || st.getTextContent().isBlank())
+            pm.getErrors().add("SIM-X10 " + msgId + ": IntrBkSttlmAmt with Ccy is required");
+        String uetr = text(doc, "UETR");
+        if (uetr == null || !uetr.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"))
+            pm.getErrors().add("SIM-X10 " + msgId + ": UETR must be a UUID version 4");
+        else pm.getVars().put("_uetr", uetr.toLowerCase());
+        if (p8) {
+            if (text(doc, "ChrgBr") == null) pm.getErrors().add("SIM-X10 pacs.008: ChrgBr is required");
+            if (firstByLocalName(doc, "Dbtr") == null || firstByLocalName(doc, "Cdtr") == null)
+                pm.getErrors().add("SIM-X10 pacs.008: Dbtr and Cdtr are required");
+        } else if (cov) {
+            Element und = firstByLocalName(doc, "UndrlygCstmrCdtTrf");
+            if (firstByLocalName(und, "Dbtr") == null || firstByLocalName(und, "Cdtr") == null)
+                pm.getErrors().add("SIM-X10 pacs.009 COV: underlying customer credit transfer needs Dbtr and Cdtr");
+        }
+    }
+
+    private static void requireText(Element doc, ParsedMessage pm, String name) {
+        String t = text(doc, name);
+        if (t == null || t.isBlank()) pm.getErrors().add("SIM-X10 missing " + name);
+    }
+
+    /** EndToEndId is the trade reference (MT :21:). Do not copy InstrId into the demand id. */
+    private static void applyPacsRefs(Element doc, Element hdr, String msgId, ParsedMessage pm) {
+        Map<String, String> v = pm.getVars();
+        String e2e = text(doc, "EndToEndId");
+        if (e2e != null && !e2e.isBlank()) {
+            pm.setTxRef(e2e.trim());
+            v.put("ref", e2e.trim());
+        }
+        String instr = text(doc, "InstrId");
+        if (instr != null) pm.setRelatedRef(instr.trim());
+        Element st = firstByLocalName(doc, "IntrBkSttlmAmt");
+        if (st != null) {
+            v.put("mx_amount", st.getTextContent().trim());
+            v.put("mx_currency", st.getAttribute("Ccy"));
+        }
+        v.put("mx_msg", msgId);
+        if (hdr != null && text(hdr, "BizSvc") != null) v.put("bizSvc", text(hdr, "BizSvc"));
     }
 
     private static void put(Map<String, String> v, String k, String val) {

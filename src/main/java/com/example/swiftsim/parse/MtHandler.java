@@ -10,11 +10,12 @@ import com.prowidesoftware.swift.model.field.Field32B;
 import com.prowidesoftware.swift.model.mt.AbstractMT;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.*;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -83,6 +84,12 @@ public class MtHandler {
         MANDATORY.put("455", List.of("20", "21", "30", "32A", "33a", "77A"));
         MANDATORY.put("456", List.of("20", "21", "32a", "33D", "77A", "77D"));
         MANDATORY.put("499", List.of("20", "79"));
+        // continuations of MT760 / MT767 (SR2021). At least one of 77U/77L is enforced in networkRules.
+        MANDATORY.put("761", List.of("27", "20", "52a"));
+        MANDATORY.put("775", List.of("27", "20", "21", "26E", "52a"));
+        // request for cancellation / answer. MT792 does not cancel an irrevocable undertaking or credit.
+        MANDATORY.put("792", List.of("20", "21", "11S", "79"));
+        MANDATORY.put("796", List.of("20", "21", "76"));
 
         CODE_WARN.put("22D", Set.of("DGAR", "STBY", "DEPU", "DOCR", "UNDK"));
         CODE_WARN.put("40C", Set.of("ISPR", "NONE", "OTHR", "UCPR", "URDG"));
@@ -123,12 +130,17 @@ public class MtHandler {
         for (String t : List.of("400", "410", "412", "422", "450", "455", "456")) TXREF_TAGS.put(t, List.of("21", "20"));
         TXREF_TAGS.put("416", List.of("21A", "21", "20"));
         TXREF_TAGS.put("499", List.of("21", "20"));
+        TXREF_TAGS.put("792", List.of("21", "20"));
+        TXREF_TAGS.put("796", List.of("21", "20"));
+        TXREF_TAGS.put("761", List.of("20"));
+        TXREF_TAGS.put("775", List.of("20", "21"));
     }
 
 
     private static final Pattern REF16 = Pattern.compile("^[^\\s].{0,15}$");
     private static final Pattern AMOUNT = Pattern.compile("^[A-Z]{3}(\\d{1,14},\\d{0,14})$");
-    private static final DateTimeFormatter YYMMDD = DateTimeFormatter.ofPattern("uuMMdd");
+    /** STRICT: 31 Feb must NAK (SIM-F03), not roll forward under ResolverStyle.SMART. */
+    private static final DateTimeFormatter YYMMDD = DateTimeFormatter.ofPattern("uuMMdd").withResolverStyle(ResolverStyle.STRICT);
 
     public static boolean looksLikeMt(String raw) {
         String t = raw.stripLeading();
@@ -208,7 +220,7 @@ public class MtHandler {
                     pm.getErrors().add("SIM-F03 field :" + n + ": invalid date '" + d + "' (expected YYMMDD" + (n.equals("31D") ? " followed by the place of expiry" : "") + ")");
                 }
             }
-            if (n.equals("33A") || n.equals("34A")) {
+            if (n.matches("32[CD]|3[34][ACD]")) {
                 if (!v.trim().matches("^\\d{6}[A-Z]{3}\\d{1,14},\\d{0,14}$"))
                     pm.getErrors().add("SIM-F05 field :" + n + ": must be 6!n3!a15d (date, currency, amount with decimal comma)");
                 else try { LocalDate.parse(v.trim().substring(0, 6), YYMMDD); } catch (DateTimeParseException e) {
@@ -232,6 +244,7 @@ public class MtHandler {
             }
             if (n.equals("26E") && !v.trim().matches("^\\d{1,3}$"))
                 pm.getErrors().add("SIM-F06 field :26E: must be 1-3 digits");
+            currencyOfAmount(n, v, pm);
             if (fieldFormatValidation && !flagged(pm, n)) {
                 String fe = SwiftFormat.check(n, v);
                 if (fe != null) pm.getErrors().add(fe);
@@ -261,6 +274,11 @@ public class MtHandler {
 
         // variables for templates/scenario conditions
         first.forEach((k, v) -> pm.getVars().put("f" + k, v));
+        if ("760".equals(type)) {
+            sequenceFields(tags, "15C", null).forEach((k, v) -> pm.getVars().put("seqC_" + k, v));
+            sequenceFields(tags, "15B", "15C").forEach((k, v) -> pm.getVars().putIfAbsent("seqB_" + k, v));
+        }
+        if ("456".equals(type)) aggregateDishonour(tags, pm);
         String txRef = null;
         String txTag = null;
         List<String> refTags = TXREF_TAGS.getOrDefault(type, List.of("20"));
@@ -334,6 +352,11 @@ public class MtHandler {
     static void networkRules(String type, Map<String, String> f, List<Tag> tags, ParsedMessage pm) {
         List<String> e = pm.getErrors();
         switch (type) {
+            case "760" -> mt760Rules(f, tags, pm);
+            case "761", "775" -> {
+                if (!f.containsKey("77U") && !f.containsKey("77L"))
+                    e.add("SIM-N65 MT" + type + ": at least one of field 77U or 77L (continuation narrative) must be present");
+            }
             case "700", "710", "720", "740" -> {
                 boolean c42 = f.containsKey("42C"), a42 = f.containsKey("42A") || f.containsKey("42D");
                 if (c42 != a42) e.add("SIM-N10 MT" + type + ": fields 42C (drafts at) and 42a (drawee) must be present together");
@@ -395,6 +418,96 @@ public class MtHandler {
             case "456" -> sameCcy(type, f, e, "32", "33");
             default -> { }
         }
+    }
+
+    /** SR2021 MT760 conditional rules the simulator enforces (SIM-N60..N64). Not the full NVR set. */
+    private static void mt760Rules(Map<String, String> f, List<Tag> tags, ParsedMessage pm) {
+        List<String> e = pm.getErrors();
+        String purpose = f.get("22A") == null ? null : f.get("22A").trim().split("[\\n/]", 2)[0].trim();
+        boolean seqC = tags.stream().anyMatch(t -> "15C".equals(t.getName()));
+        boolean counter = "ISCO".equals(purpose) || "ICCA".equals(purpose);
+        if (purpose != null && !Set.of("ACNA", "ADVI", "ICCA", "ISCO", "ISSU").contains(purpose))
+            e.add("SIM-N60 MT760: field 22A must be ACNA, ADVI, ICCA, ISCO or ISSU (got '" + purpose + "')");
+        if (counter && !seqC)
+            e.add("SIM-N61 MT760: sequence C (local / requested undertaking) is mandatory when field 22A is " + purpose);
+        if (purpose != null && !counter && seqC)
+            e.add("SIM-N62 MT760: sequence C is not allowed when field 22A is " + purpose);
+        if (purpose == null && seqC)
+            e.add("SIM-N62 MT760: sequence C is only allowed when field 22A is ISCO or ICCA");
+        check760Form49(sequenceFields(tags, "15B", "15C"), "sequence B", e);
+        if (seqC) {
+            Map<String, String> c = sequenceFields(tags, "15C", null);
+            check760Form49(c, "sequence C", e);
+            if (counter && (!c.containsKey("22D") || !(c.containsKey("32B")) || !(c.containsKey("59") || c.containsKey("59A"))))
+                e.add("SIM-N64 MT760: sequence C must contain the local undertaking fields 22D, 32B and 59a");
+        }
+    }
+
+    private static void check760Form49(Map<String, String> seq, String where, List<String> e) {
+        String form = seq.get("22D") == null ? null : seq.get("22D").trim().split("[\\n/]", 2)[0].trim();
+        if ("STBY".equals(form) && !seq.containsKey("49"))
+            e.add("SIM-N63 MT760: field 49 (confirmation instructions) is mandatory in " + where + " when field 22D is STBY");
+        if (("DGAR".equals(form) || "DEPU".equals(form)) && seq.containsKey("49"))
+            e.add("SIM-N63 MT760: field 49 is not allowed in " + where + " when field 22D is " + form);
+    }
+
+    /** Fields of one MT760 sequence, from its 15a marker up to (not including) the next marker. */
+    static Map<String, String> sequenceFields(List<Tag> tags, String start, String end) {
+        Map<String, String> m = new LinkedHashMap<>();
+        boolean on = false;
+        for (Tag t : tags) {
+            String n = t.getName();
+            if (start.equals(n)) { on = true; continue; }
+            if (on && n != null && n.matches("15[A-C]")) {
+                if (end == null || end.equals(n)) break;
+                break;
+            }
+            if (on) m.putIfAbsent(n, t.getValue() == null ? "" : t.getValue());
+        }
+        return m;
+    }
+
+    private static void currencyOfAmount(String tag, String value, ParsedMessage pm) {
+        if (tag == null || value == null || !tag.matches("3[2-9][A-D]?")) return;
+        String t = value.trim();
+        boolean dated = t.matches("^\\d{6}[A-Z]{3}\\d{1,14},\\d{0,14}$");
+        boolean plain = t.matches("^[A-Z]{3}\\d{1,14},\\d{0,14}$");
+        if (!dated && !plain) return;
+        String err = dated ? Iso4217.checkSwift(t.substring(6, 9), t.substring(9)) : Iso4217.checkSwift(t.substring(0, 3), t.substring(3));
+        if (err != null) pm.getErrors().add("SIM-F07 field :" + tag + ": " + err);
+    }
+
+    /** MT456 may repeat one sequence per dishonoured item. Sum the debits and keep every narrative. */
+    private static void aggregateDishonour(List<Tag> tags, ParsedMessage pm) {
+        List<Tag> debits = tags.stream().filter(t -> t.getName() != null && t.getName().startsWith("33")).toList();
+        if (debits.size() <= 1) {
+            pm.getVars().put("f456Items", "1");
+            return;
+        }
+        BigDecimal sum = BigDecimal.ZERO;
+        String prefix = null;
+        for (Tag t : debits) {
+            String v = t.getValue() == null ? "" : t.getValue().trim();
+            int amtAt = v.matches("^\\d{6}[A-Z]{3}.*") ? 9 : 3;
+            if (prefix == null) prefix = v.substring(0, amtAt);
+            try {
+                String num = v.substring(amtAt).replace(',', '.');
+                if (num.endsWith(".")) num = num + "0";
+                sum = sum.add(new BigDecimal(num));
+            } catch (Exception ignored) { }
+        }
+        String name = debits.get(0).getName();
+        int exp = prefix != null && prefix.length() >= 3 ? Optional.ofNullable(Iso4217.exponent(prefix.substring(prefix.length() - 3))).orElse(2) : 2;
+        pm.getVars().put("f" + name, prefix + sum.setScale(exp, java.math.RoundingMode.HALF_UP).toPlainString().replace('.', ','));
+        pm.getVars().put("f456Items", String.valueOf(debits.size()));
+        joinRepeat(tags, pm, "77A");
+        joinRepeat(tags, pm, "77D");
+    }
+
+    private static void joinRepeat(List<Tag> tags, ParsedMessage pm, String name) {
+        List<String> parts = tags.stream().filter(t -> name.equals(t.getName()) && t.getValue() != null && !t.getValue().isBlank())
+                .map(t -> t.getValue().trim()).toList();
+        if (parts.size() > 1) pm.getVars().put("f" + name, String.join("\n", parts));
     }
 
     private static void sameCcy(String type, Map<String, String> f, List<String> e, String... nums) {

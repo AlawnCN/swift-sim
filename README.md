@@ -16,7 +16,7 @@
      ▼
  ┌────────────────────────── swift-sim (Spring Boot 3.5, Java 21, 127.0.0.1:8080) ───────────────────────────┐
  │ 1. 格式自动识别 MT({1: 开头) / MX(< 开头)                                                                     │
- │ 2. 校验  MT: Prowide Core (pw-swift-core SRU2025) 解析 + 必填字段/格式检查 + 2 条 MT765 网络规则               │
+ │ 2. 校验  MT: Prowide Core (pw-swift-core SRU2025) 解析 + 必填字段/格式/严格日期/ISO 4217 + MT765 与 MT760 条件规则 │
  │          MX: iso20022.org 官方 XSD 校验 (src/main/resources/xsd) + Prowide ISO 20022 (pw-iso20022) 建模        │
  │ 3. 网关 ACK / NAK（FIN 风格 {451:0}/{451:1}{405:...}，会话号/ISN/MIR；MX 用简单 XML 回执）                     │
  │ 4. 延迟投递 → output 格式 + MOR/OSN + {5:{CHK:}{TNG:}} → outbox、webhook、投递通知(DLV，仿 MT011)              │
@@ -157,7 +157,9 @@ BIC 规则：银行代码均为 `TST?`，位置代码第二位为 `0` 或数字�
 
 | MT | 名称 | 模拟器检查的必填字段（取自 Prowide SRU2025 类结构） |
 |---|---|---|
-| 760 | Issue of a Demand Guarantee / Standby LC | 15A, 27, 22A, 15B, 20, 30, 22D, 40C, 23B, 52a, 59a, 32B, 77U（只检查必选序列 A/B） |
+| 760 | Issue of a Demand Guarantee / Standby LC | 15A, 27, 22A, 15B, 20, 30, 22D, 40C, 23B, 52a, 59a, 32B, 77U。条件：22D=STBY 时序列内必须有 49；22A=ISCO/ICCA 时必须有序列 C（当地/请求保函），否则不允许序列 C |
+| 761 | Continuation of MT760 | 27, 20, 52a，以及 77U 或 77L 至少一个。文本追加到保函 additionalTerms，不改金额 |
+| 775 | Continuation of MT767 | 27, 20, 21, 26E, 52a，以及 77U 或 77L 至少一个 |
 | 767 | Amendment | 15A, 27, 21, 22A, 15B, 20, 26E, 30, 52a |
 | 768 | Acknowledgement | 20, 21, 30 |
 | 769 | Advice of Reduction or Release | 20, 21 |
@@ -166,9 +168,11 @@ BIC 规则：银行代码均为 `TST?`，位置代码第二位为 `0` 或数字�
 | 786 | Demand Refusal Advice | 20, 52a, 30, 32B, 77J |
 | 787 | Amendment Response | 20, 21, 52a, 26E, 23R |
 | 759 | Ancillary Trade Structured Message | 27, 20, 22D, 23H, 45D |
-| 202 | （仅用于"索赔已付"场景的结算腿示意，非第一期范围） | 20, 21, 32A, 58a |
+| 202 | 银行间资金腿（默认）。block 3 `{121:}` UETR 必填 | 20, 21, 32A, 58a |
+| 792 | Request for Cancellation | 20, 21, 11S, 79。只记 CANCELLATION_REQUESTED，不撤销不可撤销的保函/信用证/托收（那要走 MT767/707/747） |
+| 796 | Answers | 20, 21, 76 |
 
-其他检查：20/21/23 为 1–16 字符且不能以 `/` 开头/结尾、不能含 `//`；日期字段 YYMMDD 合法；金额 `3!a15d` 且必须用小数逗号；26E 为 1–3 位数字；
+其他检查：20/21/23 为 1–16 字符且不能以 `/` 开头/结尾、不能含 `//`；日期字段 YYMMDD 按 `ResolverStyle.STRICT` 解析（`260231` 直接 NAK，不会被改成 2 月 28 日）；金额 `3!a15d` 且必须用小数逗号，币种须为已知 ISO 4217，小数位须等于该币种的辅币位数（T40/T43，`SIM-F07`）；26E 为 1–3 位数字；
 22D/40C/23B/22G/23R/23H 的代码不在已知列表时只给**警告**（不 NAK，见 TODO）。
 
 交易参考号 (txRef) 提取规则：MT768/769/202 取 :21:，MT759 取 :23:（无则 :21:/:20:），其余取 :20:（保函编号）。
@@ -184,6 +188,8 @@ BIC 规则：银行代码均为 `TST?`，位置代码第二位为 `0` 或数字�
 `tsrv.017` DemandWithdrawalNotification、`tsrv.019` UndertakingStatusReport、`tsin.005` UndertakingApplication —— 全部为 **.001.01** 版本
 （iso20022.org 与 Prowide 中目前仅有该版本）。
 
+资金腿（CBPR+，与 MT202/MT103 并存，**MT 仍是场景默认**）：`pacs.008.001.08`（客户汇款，对应 MT103）和 `pacs.009.001.08`（行间汇款）。`pacs.009` 含 `UndrlygCstmrCdtTrf` 时为 **COV**，否则为 **CORE**。`EndToEndId` 等于贸易参考号（保函号 / 交单或索偿号 / 托收号），`IntrBkSttlmAmt` 是入账金额。这两类不做完整 XSD（schema 未随包提供），模拟器检查报文骨架、UETR、结算金额和 CORE/COV 是否与 `BizSvc` 一致。
+
 * 可以只发 `<Document>`，也可以带 BAH：`<RequestPayload><AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">…</AppHdr><Document>…</Document></RequestPayload>`。
   AppHdr (head.001.001.02) 同样做 XSD 校验；其 `Fr/To` BICFI 作为发/收报行。无 AppHdr 时用 `?from=&to=`，再没有则用 `gateway.defaultMxSender/Receiver`。
 * 模拟器发出的 MX 由 Prowide 生成（`AbstractMX.parse` + `AppHdrFactory.createBusinessAppHdrV02` + `message()`），带 `head:`/`tsrv:` 前缀。
@@ -192,7 +198,7 @@ BIC 规则：银行代码均为 `TST?`，位置代码第二位为 `0` 或数字�
 
 每一笔保函/备用证（以 MT `:20:` 保函编号 / MX `UdrtkgId/Id` 为键，**模拟器内全局唯一**——简化处理）在 H2 中有一份持久化台账：
 参与方及角色、币种、原始金额/当前金额/**余额 (outstanding)**、开立日、到期类型/到期日、规则 (URDG/ISP…)、受益人/申请人、
-修改记录（PENDING/ACCEPTED/REJECTED/EFFECTIVE）、索赔记录（RECEIVED/PAID/REFUSED/EXTENDED/WITHDRAWN）、余额变动（ISSUE/INCREASE/DECREASE/PAYMENT/REDUCTION/RELEASE）、
+修改记录（PENDING/ACCEPTED/REJECTED/EFFECTIVE）、索赔记录（RECEIVED/ACCEPTED/PARTIALLY_PAID/PAID/REFUSED/EXTENDED/WITHDRAWN）、余额变动（ISSUE/INCREASE/DECREASE/PAYMENT/REDUCTION/RELEASE/REQUEST）、
 以及**状态历史**（每条事件带营业日、关联报文 ID）。台账在**收报方"业务系统"收到报文时**（投递时）更新，网络层 ACK 与业务处理完全分离。
 
 ### 状态
@@ -204,14 +210,17 @@ BIC 规则：银行代码均为 `TST?`，位置代码第二位为 `0` 或数字�
    MT767/tsrv.005 ─▶ AMENDMENT_PENDING ─MT787/tsrv.008 ACPT─▶ AMENDED (金额/到期日生效)
                                        └─ REJT ─▶ (回到原状态, 修改记为 REJECTED)
    tsrv.005 BnfcryCnsntReqInd=false 或 "延期或付款"期间的延期修改 ─▶ 直接生效 (EFFECTIVE)   [近似, 见 TODO]
-   MT765/tsrv.013 PAYM ─▶ DEMAND_RECEIVED ─MT202 或 tsrv.019(DMND/ACCP)─▶ PAID (余额减少)
+   MT765/tsrv.013 PAYM ─▶ DEMAND_RECEIVED ─tsrv.019(DMND/ACCP)─▶ DEMAND_ACCEPTED ─MT202/MT103 或 pacs.008/pacs.009─▶ PAID
+                         └─付款金额 < 索赔额─▶ PARTIALLY_PAID（未付部分保持可付，不记为已全额付款）
                                           └─MT786/tsrv.016─▶ REFUSED      └─tsrv.017─▶ (索赔 WITHDRAWN)
    MT765/tsrv.013 PAEX ─▶ EXTEND_OR_PAY_PENDING ─延期修改─▶ EXTENDED │ ─付款─▶ PAID │ ─拒付─▶ REFUSED
    MT769 (32B=减额) ─▶ REDUCED；余额减到 0 ─▶ RELEASED          tsrv.012 ─▶ TERMINATED
    MT785/tsrv.011 只记录"不展期通知"标志；到期日过后（营业日）─▶ EXPIRED（有未决索赔时暂不过期）
 ```
-状态 = 里程碑（ISSUED/ADVISED/AMENDED/PAID/REFUSED/EXTENDED/REDUCED/RELEASED/EXPIRED/TERMINATED）+ 叠加的"未决事项"
-（有未决索赔 → `DEMAND_RECEIVED` / `EXTEND_OR_PAY_PENDING`；否则有未决修改 → `AMENDMENT_PENDING`）。终态：RELEASED / EXPIRED / TERMINATED。
+状态 = 里程碑（ISSUED/ADVISED/AMENDED/PAID/REFUSED/EXTENDED/REDUCED/RELEASED/EXPIRED/TERMINATED/REQUESTED）+ 叠加的"未决事项"
+（未决索赔 `RECEIVED` → `DEMAND_RECEIVED`，已受理待付款 → `DEMAND_ACCEPTED`，部分付款 → `PARTIALLY_PAID`，展期或付款 → `EXTEND_OR_PAY_PENDING`；否则有未决修改 → `AMENDMENT_PENDING`）。终态：RELEASED / EXPIRED / TERMINATED。
+
+**反担保（MT760 `22A:ISCO` 或 `ICCA`）**记两笔义务：序列 B 是反担保本身（`obligationKind=COUNTER`，状态按正常开立走），序列 C 是请求对方开立的当地保函（`obligationKind=LOCAL`，状态 `REQUESTED`，开立行=收报行）。两笔用 `relatedRef` 互指。当地保函编号取叙述里的 `/LOCALREF/<编号>`，否则为 `L` + 反担保编号。当地行随后用这个编号发 MT760 `ISSU`，台账从 `REQUESTED` 改为 `ISSUED`（不重复记一笔开立金额）。
 
 ### 业务拒绝（虚拟行作为收报方时）
 虚拟行收到与台账不一致的报文时，**网络层照常 ACK**，业务层回一条拒绝：MT 入站 → **MT759** (`23H:OTHERFNC`，45D 中列出 BIZ 码；格式为模拟器约定，见 TODO)，
@@ -281,11 +290,12 @@ tsin.005：发报行 = APPLICANT，收报行 = ISSUER。线下关系（例如申
 
 ### 托收（MT400/410/412/416/420/422/430/450/455/456 + MT202/MT103；MT405 已从 SRU2025 删除，未实现）
 * **托收指示约定**：SR2025 没有银行间"托收指示" FIN 报文（指示随单据寄送），模拟器用 **MT499 `:79:/COLLINST/<DP|DA|CLEAN|CASH>`** 表示，
-  后续行 `/URC522/ /AMOUNT/<币种金额> /TENOR/<AT SIGHT|nn DAYS AFTER SIGHT> /MATURITY/<YYMMDD> /DRAWER/ /DRAWEE/ /DOCS/ /CHARGES/ /PROTEST/`。`:20:` = 托收编号。
+  后续行 `/URC522/ /AMOUNT/<币种金额> /TENOR/<AT SIGHT|nn DAYS AFTER SIGHT> /MATURITY/<YYMMDD> /DRAWER/ /DRAWEE/ /DOCS/ /CHARGES/ /PROTEST/ /PARTIAL/YES`。`:20:` = 托收编号。
+  跟单托收（DP/DA）的部分付款必须带 `/PARTIAL/YES`（URC 522 第 19 条），否则 `BIZ-K13`。`/PARTIAL/NO` 明确禁止。
 * 状态：`SENT → ACKNOWLEDGED → ACCEPTED → PARTIALLY_PAID → PAID`、`NON_ACCEPTED / NON_PAID`、`AMENDED`、覆盖状态 `TRACER`、终态 `PAID / RETURNED`。
   MT422 `76:` 含 `/RETURNED/` = 单据已退回；MT430 `74:` 含 `/RETURN/` = 请求退单。
 * 业务拒绝码（虚拟行回 **MT499** `79:`，Cat 4 无拒绝报文，模拟器约定）：`BIZ-K01` 超额付款/承兑、`K02` 重复托收编号、`K03` 金额缺失、`K04` D/A 缺少远期期限、
-  `K05` MT410 金额与托收不符、`K06` 非 D/A 的承兑通知、`K07` 已全额付款、`K08` MT430 32a 与原金额不符、`K09` 重复承兑、`K10` 头寸/扣账大于已付、`K11` 未知类型、`K12` 无可调整金额，
+  `K05` MT410 金额与托收不符、`K06` 非 D/A 的承兑通知、`K07` 已全额付款、`K08` MT430 32a 与原金额不符、`K09` 重复承兑、`K10` 头寸/扣账大于已付、`K11` 未知类型、`K12` 无可调整金额、`K13` 未授权的部分付款、`K14`（仅当 `enforceCollectionMaturity=true`）到期前付款，
   另有 `R01–R03`（方向：MT410/412/416/422/400 必须由代收行发出，MT420/430 必须由托收行发出）。
 
 ### 保函补充约定（Stage 1）
@@ -684,6 +694,7 @@ tests/temp-instance.sh wipe
 * **E. 审核队列**：审核模式下不自动回复、ACCEPT、重复处理 409、REFUSE+原因（MT787 REJT）、BUSINESS_REJECT（BIZ-A02）、CUSTOM 原文、MX 索赔 PAY。
 * **G. 保函补充**：开立行发起修改（MT767 / tsrv.005 → AMENDMENT_PENDING）、SUT MT768 时开立行静默、SUT MT787 后开立行 MT759 跟进、独立减额 MT769（33B/34B）、
   SUT 发 MT769 34B 不一致 BIZ-M03、索赔 + 20 秒后 MT759 撤回、tsrv.017 撤回未决索赔、MT759 查询 → SUT 回答 → QUERY_ANSWERED。
+* **K. 审计修复**：非法日期 `260231`、币种 `ZZZ`、ISSU+STBY 缺 49、ISCO 缺序列 C 均 NAK；ISCO 记两笔义务；pacs.009 部分付款后补足；MT761 续报写入条款。
 * **H. 跟单信用证**：SUT 开证 → MT730、重复证号、修改 /BENACC/ 生效、修改待决 + 并发修改 BIZ-A01 / 序号 BIZ-A0x、MT740 + 重复 BIZ-L13、索偿行→偿付行 MT742 → MT202 + MT799、
   议付行交单 MT754 → SUT 付款 MT756+MT202（PAID）、重复付款 BIZ-L09、超额交单（INCONSISTENT BIZ-L01）、PDE 重复交单只记一次、MT750 不符点 → SUT MT734 拒付；
   SUT 为通知/指定行：MT730、MT707 + /BENACC/、MT754 → 开证行 MT756+MT202、超额支用 BIZ-L01、MT750 → MT734、重复交单号 BIZ-L04、开证行静默 + kickoff 付款、
@@ -698,29 +709,31 @@ tests/temp-instance.sh wipe
 
 ## 9. 已知限制 / TODO（请勿当作 SWIFT 规则依据）
 
-* **不是完整的 SWIFT 网络校验**：必填字段来自 Prowide SRU2025 结构，字段格式/长度/字符集来自 Prowide `validatorPattern`，另有 MT765 两条规则；
-  未实现可选序列内部必填、绝大多数 NVR/用法规则 (C/D/E/T 错误码)。完整校验需 SWIFT 官方 NVR 或商用校验器。
+* **不是完整的 SWIFT 网络校验**：必填字段来自 Prowide SRU2025 结构，字段格式/长度/字符集来自 Prowide `validatorPattern`，另有 MT765 两条规则和 MT760 的 22A/49/序列 C 条件规则；
+  未实现可选序列内部必填、绝大多数 NVR/用法规则 (C/D/E/T 错误码)。完整校验需 SWIFT 官方 NVR 或商用校验器。日期用严格日历；币种用内置 ISO 4217 表（不是 SWIFT 的实时代码表）。
 * **网关报文均为近似**：ACK/NAK 的 405 错误码是模拟器自定义 `SIMxxx`（真实 FIN 为 `T/H/M…` 错误码，未实现）；DLV 仅"仿 MT011"结构（字段未逐项核对 FIN 系统报文手册），
   MT010/MT019 未生成；CHK 不是真实校验和；会话为每次启动 +1，不模拟 login/select/quit、窗口、序号缺口恢复；MX 回执不是 FINplus/InterAct 的 xsys 报文，无签名 / LAU / PKI。
 * TODO 代码值/语义需对照 SWIFT UHB (SR2021+) 核实：
-  * MT787 `23R` 用 `ACPT/REJT`；MT765 `22G` 用 `PAYM/PAEX`；MT767 `22A` 用 `ISUA`；MT760 `22A` 完整代码集；
+  * MT787 `23R` 用 `ACPT/REJT`；MT765 `22G` 用 `PAYM/PAEX`；MT767 `22A` 用 `ISUA`；MT760 `22A` 用 `ACNA/ADVI/ICCA/ISCO/ISSU`；
   * MT767 中 32B = 增额、33B = 减额（台账按此记账）；MT769 现按 Prowide SRU2025 字段名：33B = 减额/解除金额、34B = 余额、32B/32D = 费用（旧报文仅有 32B 时仍视为减额；若与一笔已付但未通知减额的索赔金额相同，则视为该付款的减额通知，不再重复扣减），39C 未处理；
   * MT785 中 31C/31E 的含义；MT759 `23H` 的代码（`OTHERFNC`/`GENINFAD`/`REQISSUE` 仅为占位）；
   * **业务拒绝的格式**：MT 侧用 MT759 `23H:OTHERFNC` + 45D 原因、MX 侧用 tsrv.019 `Sts=REJT` —— 这是**模拟器约定**，真实银行间如何拒绝需核实；
-  * tsrv.019 `StsCtgy`（`ISSU/DMND/TERM/NEXT/APPL/GENR`）为占位，需按 ISO 20022 External Code Sets 核实；MX 侧"索赔已付"用 tsrv.019 `DMND/ACCP` 表示（未模拟 pacs.009）；
+  * tsrv.019 `StsCtgy` 白名单为 `ISSU/DMND/TERM/NEXT/APPL/GENR`（未知值 NAK `SIM-X07`），仍需对照 ISO 20022 External Code Sets；`DMND/ACCP` 只表示索赔已受理（`DEMAND_ACCEPTED`），付款由 MT202/MT103 或 pacs.008/pacs.009 完成；
   * "延期或付款"期间开立行发出的延期修改**直接生效**、tsrv.005 `BnfcryCnsntReqInd=false` 直接生效 —— 简化处理（URDG 下修改原则上需受益人同意）；
   * MT768 / tsrv.019 ACCP 由通知行发给开立行即视为"已通知 (ADVISED)" —— 简化；
   * N 优先级 + monitoring 1/3 只给警告；UETR 要求仅对 MT103/202/205。
 * tsrv.008 v01 没有拒绝原因字段，所以 MX 的修改拒绝只有状态码。
-* 台账简化：保函编号全局唯一（真实世界中编号只在开立行内唯一）；参与方角色从报文字段推断，线下关系需用 API 补登记；营业日不考虑节假日 / 时区 / 截止时间。
-* MX 仅支持 `.001.01` 版本；AppHdr 只校验 head.001.001.02。日志/台账库无清理策略。
-* 无鉴权、无 HTTPS；单实例（只监听 127.0.0.1）。
-* 未覆盖：MT761/775（多部分）、MT 798 企业报文。
+* 台账简化：保函编号全局唯一（真实世界中编号只在开立行内唯一）；参与方角色从报文字段推断，线下关系需用 API 补登记。营业日排除周末，并可在 `ledger.holidays` 追加共享的非营业日（没有按银行的假日表，也没有时区/截止时间）。
+* 台账更新与报文 `DELIVERED` 在同一事务提交。重启只重放仍为 `ACK` 的报文；若该报文号已经记过台账事件，则只补投递、不再改台账。文件 outbox 和 webhook 仍在事务之外。
+* MX 贸易报文仅支持 `.001.01`；资金腿另支持 `pacs.008.001.08` 与 `pacs.009.001.08`（结构检查，不是完整 XSD）。AppHdr 只接受 head.001.001.02（其它命名空间 NAK `SIM-X06`）。一条报文里出现两个 `<Document>` 会被拒绝。日志/台账库无清理策略。
+* 无鉴权、无 HTTPS；单实例（只监听 127.0.0.1）。8080 不鉴权是故意的。
+* 未覆盖：MT 798 企业报文。MT701/708/711/721 续页仍只挂关联；MT761/775 会把叙述追加到保函 `additionalTerms`。
 * **跟单信用证 / 托收（Stage 2/3）的已知限制与 SR2025 不确定点**（请对照 SWIFT UHB 核实）：
   * 只支持 MT（Prowide 无 LC / 托收 MX）；MT701/708/711/721 只做续页关联，不合并字段；MT405 在 SRU2025 中已删除，未实现。
   * **托收指示用 MT499 `/COLLINST/`、托收业务拒绝用 MT499、MT730 的 `/CONFIRMED/`、LC 业务拒绝用 MT759 `22D:DOCR`** 均为模拟器约定；`/BENACC/` `/BENREJ/` 为 SR2018+ 常用写法但仍需核实。
   * MT455 的 33C/33D 按"33C = 贷记调整、33D = 借记调整"理解（Prowide 格式为 日期+币种+金额）；MT744 `73R/73S` 只用 `OTHR/…` 代码；MT416 未使用 23E；MT707 `22A` 只用 `ISSU`；
     MT430 32a/33a 只支持 A/K 选项中的 A；MT752 只认 `REMITTED/DEBIT` 为付款。
-  * 偿付授权金额含 39A 上浮（MT740 32B × (1+上浮%)）；MT747 34B 由模拟器按"原授权 + 10%"生成；议付行对偿付行的索偿也计入信用证已用金额（与 MT754 同时使用时可能重复计算——请只用其一测试余额）。
-  * 银行工作日只排除周末（无节假日）；L06 "5 个银行工作日"按营业日计算。
+  * 偿付授权金额含 39A 上浮（MT740 32B × (1+上浮%)）；MT747 34B 由模拟器按"原授权 + 10%"生成。MT742 与交单的关联：`:72Z:` 的 `/PRESREF/<交单号>`（或索偿 `:20:` 与交单 `:20:` 相同）显式关联；否则仅当同一交单行恰好有一笔金额等于 32B 本金、且尚未关联的交单时才自动关联。只有该索偿行没有任何可关联的交单时，才按 **32B 本金**（而不是 34a）记占用。交单已经存在但无法唯一对应（金额不一致、多笔、或已经记过占用）时不再记第二笔占用，并在偿付事件里写明未能关联。
+  * 延期/承兑交单（MT754 用 32B 而非 32A）可在 `:72Z:` 写 `/MATURITY/YYMMDD`。到期前的付款仍入账，并在事件里注明早于到期日。32A 表示指定行已垫付/议付（`nominatedBankPaid`）。
+  * 银行工作日排除周末，并排除 `ledger.holidays`；L06 "5 个银行工作日"按这个日历计算。
   * UI 页面仍以保函台账为主，LC / 托收台账请用 `/api/lcs`、`/api/collections`（或台账 JSON）查看。

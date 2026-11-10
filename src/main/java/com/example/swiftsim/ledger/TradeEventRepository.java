@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface TradeEventRepository extends JpaRepository<TradeEvent, Long> {
     List<TradeEvent> findByKindAndLedgerIdOrderByIdAsc(String kind, Long ledgerId);
     List<TradeEvent> findByKindAndRefAndLedgerIdIsNullOrderByIdAsc(String kind, String ref);
+
+    boolean existsByMessageId(Long messageId);
 }

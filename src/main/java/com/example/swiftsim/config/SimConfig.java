@@ -44,5 +44,11 @@ public class SimConfig {
         private double rejectDelaySeconds = 1;
         /** Expiry sweep interval. */
         private long expirySweepMs = 60000;
+        /** Extra non-business days (ISO dates) on top of weekends. Empty keeps weekend-only banking days. */
+        private List<String> holidays = new ArrayList<>();
+        /** When true, fallback scenarios (generic-ack, trade-no-reply) do not run. Default false. */
+        private boolean disableFallbackScenarios = false;
+        /** When true, a D/A collection payment before maturity is BIZ-K14. Default false (date is recorded, early payment allowed). */
+        private boolean enforceCollectionMaturity = false;
     }
 }

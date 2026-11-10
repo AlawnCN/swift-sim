@@ -105,7 +105,8 @@ public class ScenarioEngine {
                     "Requested scenario '" + override + "' has no reaction for " + pm.getShortType() + " to " + recv.get().getId() + "; using active scenario");
         }
         if (chosen == null) chosen = cands.stream().filter(m -> !m.scenario().isFallback() && cfg.isActive(m.scenario())).findFirst().orElse(null);
-        if (chosen == null) chosen = cands.stream().filter(m -> m.scenario().isFallback()).findFirst().orElse(null);
+        if (chosen == null && !cfg.getConfig().getLedger().isDisableFallbackScenarios())
+            chosen = cands.stream().filter(m -> m.scenario().isFallback()).findFirst().orElse(null);
         if (chosen == null) {
             gateway.note(pm.getTxRef(), null, rec.getId(), "No scenario reaction for " + pm.getShortType() + " received by " + recv.get().getId());
             return;
@@ -620,6 +621,8 @@ public class ScenarioEngine {
         v.put("today6", today.format(YYMMDD));
         v.put("todayIso", today.toString());
         v.put("nowIso", LocalDateTime.now().withNano(0).toString());
+        v.put("nowUtc", OffsetDateTime.now(ZoneOffset.UTC).withNano(0).toString());
+        v.put("uetr", UUID.randomUUID().toString());
         v.put("ref", "SIMGT" + today.format(YYMMDD) + String.format("%04d", SEQ.incrementAndGet() % 10000));
         v.put("currency", "USD");
         v.put("amount", "50000,00");

@@ -55,7 +55,7 @@ public class CollectionLedgerService implements TradeLedger {
             case "MT450" -> A.CASH_CREDIT;
             case "MT455" -> A.CASH_ADJUST;
             case "MT456" -> A.DISHONOUR;
-            case "MT202", "MT103" -> A.SETTLEMENT;
+            case "MT202", "MT103", "pacs.008", "pacs.009" -> A.SETTLEMENT;
             default -> A.FREE;
         };
     }
@@ -171,6 +171,8 @@ public class CollectionLedgerService implements TradeLedger {
         c.setAcceptedAmount(BigDecimal.ZERO);
         c.setTenor(tenor);
         c.setMaturityDate(Facts.mtDate(codeValue(f79, "MATURITY")));
+        String partial = codeValue(f79, "PARTIAL");
+        c.setPartialPaymentAuthorised(partial != null && !partial.equalsIgnoreCase("NO") && !partial.equalsIgnoreCase("N"));
         c.setDrawer(trunc(codeValue(f79, "DRAWER"), 600));
         c.setDrawee(trunc(codeValue(f79, "DRAWEE"), 600));
         c.setDocuments(trunc(codeValue(f79, "DOCS"), 1000));
@@ -233,7 +235,13 @@ public class CollectionLedgerService implements TradeLedger {
         Amt x32 = amt(v, "32"), x33 = amt(v, "33");
         switch (a) {
             case FREE -> {
-                return () -> { save(c, rec); ts.event(K, c.getId(), c.getRef(), "ANCILLARY_MESSAGE", from, c.getStatus(), rec, pm.getMsgType() + " linked" + (v.get("f79") != null ? ": " + trunc(flat(v.get("f79")), 300) : "")); };
+                return () -> {
+                    save(c, rec);
+                    boolean cancel = "MT792".equals(pm.getShortType());
+                    ts.event(K, c.getId(), c.getRef(), cancel ? "CANCELLATION_REQUESTED" : "ANCILLARY_MESSAGE", from, c.getStatus(), rec,
+                            (cancel ? "MT792 cancellation request recorded; it does not cancel the collection. " : pm.getMsgType() + " linked")
+                                    + (v.get("f79") != null ? ": " + trunc(flat(v.get("f79")), 300) : ""));
+                };
             }
             case ACK -> {
                 open(c, a, errs);
@@ -337,6 +345,10 @@ public class CollectionLedgerService implements TradeLedger {
                 if (x32 == null || x32.amount() == null) errs.add("BIZ-V03 amount collected (32a) missing");
                 else if (x32.amount().compareTo(z(c.getOutstanding())) > 0)
                     errs.add("BIZ-K01 over-payment: " + sw(x32.amount()) + " exceeds the outstanding amount " + c.getCurrency() + " " + sw(c.getOutstanding()));
+                else if (a == A.PAYMENT && Set.of("DP", "DA").contains(c.getCollType()) && x32.amount().compareTo(z(c.getOutstanding())) < 0 && !Boolean.TRUE.equals(c.getPartialPaymentAuthorised()))
+                    errs.add("BIZ-K13 partial payment " + sw(x32.amount()) + " is not authorised by the collection instruction (URC 522 art. 19). Add /PARTIAL/YES to /COLLINST/.");
+                if (ts.cfg.getConfig().getLedger().isEnforceCollectionMaturity() && "DA".equals(c.getCollType()) && c.getMaturityDate() != null && ts.clock.today().isBefore(c.getMaturityDate()))
+                    errs.add("BIZ-K14 payment before maturity " + c.getMaturityDate() + " (business date " + ts.clock.today() + ")");
                 if (!errs.isEmpty()) return null;
                 return () -> {
                     BigDecimal paid = x32.amount();
@@ -383,12 +395,14 @@ public class CollectionLedgerService implements TradeLedger {
                     c.setMilestone("NON_PAID");
                     save(c, rec);
                     ts.movement(K, c.getId(), "DISHONOUR", c.getCurrency(), deb.negate(), c.getOutstanding(), rec, v.get("f20"), flat(v.get("f77D")));
-                    ts.event(K, c.getId(), c.getRef(), "DISHONOURED", from, c.getStatus(), rec, "item dishonoured, " + sw(deb) + " debited: " + flat(v.get("f77A")) + " / " + flat(v.get("f77D")));
+                    String nItems = v.getOrDefault("f456Items", "1");
+                    ts.event(K, c.getId(), c.getRef(), "DISHONOURED", from, c.getStatus(), rec, ("1".equals(nItems) ? "" : nItems + " items dishonoured, ") + sw(deb) + " debited: " + flat(v.get("f77A")) + " / " + flat(v.get("f77D")));
                 };
             }
             case SETTLEMENT -> {
-                BigDecimal amt = Facts.mtAmount(v.get("f32A"));
-                currency(c, new Amt(Facts.mtCurrency(v.get("f32A"), true), amt, null), errs);
+                BigDecimal amt = v.get("f32A") != null ? Facts.mtAmount(v.get("f32A")) : Facts.dec(v.getOrDefault("mx_amount", v.get("amountIso")));
+                String ccy = v.get("f32A") != null ? Facts.mtCurrency(v.get("f32A"), true) : v.getOrDefault("mx_currency", v.get("currency"));
+                currency(c, new Amt(ccy, amt, null), errs);
                 if (amt != null && amt.compareTo(z(c.getPaidAmount())) > 0)
                     errs.add("BIZ-K10 cover amount " + sw(amt) + " exceeds the proceeds advised so far " + c.getCurrency() + " " + sw(c.getPaidAmount()));
                 if (!errs.isEmpty()) return null;
@@ -530,6 +544,7 @@ public class CollectionLedgerService implements TradeLedger {
         m.put("tracerPending", c.getTracerPending());
         m.put("tracerCount", c.getTracerCount());
         m.put("returnRequested", c.getReturnRequested());
+        m.put("partialPaymentAuthorised", c.getPartialPaymentAuthorised());
         m.put("createdAt", c.getCreatedAt());
         m.put("updatedAt", c.getUpdatedAt());
         return m;

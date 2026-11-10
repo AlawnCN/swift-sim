@@ -237,7 +237,9 @@ public class ReviewService {
 
     private void pay(String label, Map<String, String> base, boolean mx, Participant me, Participant other, MessageRecord rec, List<Map<String, Object>> sent) {
         if (mx) {
-            sent.add(send(label, "tsrv019-status.xml", base, Map.of("statusCategory", "DMND", "status", "ACCP", "info", "DEMAND HONOURED - PAYMENT EXECUTED"), me, other, rec));
+            sent.add(send(label, "tsrv019-status.xml", base, Map.of("statusCategory", "DMND", "status", "ACCP", "info", "DEMAND ACCEPTED - PAYMENT WILL FOLLOW"), me, other, rec));
+            Long pid = engine.sendLater("REVIEW", label, "pacs009-core-settlement.xml", base, Map.of(), me, other, rec.getId(), 2);
+            sent.add(Map.of("template", "pacs009-core-settlement.xml", "pendingResponseId", pid == null ? "" : pid, "note", "pacs.009 CORE settlement in ~2s"));
         } else {
             sent.add(send(label, "mt202-settlement.fin", base, Map.of(), me, other, rec));
             Long pid = engine.sendLater("REVIEW", label, "mt769-reduction.fin", base, Map.of(), me, other, rec.getId(), 2);

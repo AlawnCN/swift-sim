@@ -18,6 +18,9 @@ ledger:
   rejectUnknownReferences: true      # message for an unknown undertaking number -> BIZ-U01
   preIssuanceMt759Codes: [REQISSUE]  # MT759 23H codes allowed before an undertaking exists (TODO verify code list)
   rejectDelaySeconds: 1
+  holidays: []                  # extra non-business days (YYYY-MM-DD) on top of weekends; empty = weekends only
+  disableFallbackScenarios: false  # true = do not run generic-ack / trade-no-reply
+  enforceCollectionMaturity: false # true = D/A payment before maturity is BIZ-K14 (default records the date and allows early payment)
 
 participants:
   - id: SUT_BANK

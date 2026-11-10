@@ -378,6 +378,7 @@ record("E7 review queue history", c == 200 and sum(1 for i in allq if i["status"
 # ================================================================ G-J. Stage 1-3 (guarantee gaps, documentary credits, collections)
 exec(compile(open(os.path.join(ROOT, "tests", "e2e_trade_cases.py")).read(), "e2e_trade_cases.py", "exec"))
 exec(compile(open(os.path.join(ROOT, "tests", "e2e_ops.py")).read(), "e2e_ops.py", "exec"))
+exec(compile(open(os.path.join(ROOT, "tests", "e2e_audit.py")).read(), "e2e_audit.py", "exec"))
 
 # ================================================================ F. restart persistence
 if "--no-restart" not in sys.argv:

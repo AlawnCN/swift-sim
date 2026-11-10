@@ -121,7 +121,7 @@ scenarios:
   # 4/5 -------------------------------------------------------------- demand
   - id: demand-paid
     name: 索赔付款 Demand paid
-    description: SUT (beneficiary bank) sends MT765 PAYM / tsrv.013 to ISSUING_BANK -> MT768 ack, MT202 settlement, MT769 reduction (MX - tsrv.019 ACCP; payment pacs.009 not simulated). Kickoff = BENEFICIARY_BANK presents MT765 demand to SUT (SUT = issuer).
+    description: SUT (beneficiary bank) sends MT765 PAYM / tsrv.013 to ISSUING_BANK -> MT768 ack, MT202 settlement, MT769 reduction. MX - tsrv.019 DMND/ACCP only accepts the demand (payment will follow); pacs.009 CORE settles it. MT remains the default. Kickoff = BENEFICIARY_BANK presents MT765 demand to SUT (SUT = issuer).
     group: demand
     default: true
     reactions:
@@ -135,6 +135,7 @@ scenarios:
             vars: { statusCategory: DMND, status: ACCP, info: "DEMAND ACCEPTED - PAYMENT WILL FOLLOW" }
           - delaySeconds: 3
             mt: mt202-settlement.fin
+            mx: pacs009-core-settlement.xml
           - delaySeconds: 4
             mt: mt769-reduction.fin
     kickoff:
@@ -881,7 +882,7 @@ scenarios:
 
   - id: coll-partial
     name: 托收部分付款 Collection partially paid
-    description: Instruction -> MT410 (2 s), MT400 for half the amount (5 s) + MT202 (6 s). The collection stays PARTIALLY_PAID.
+    description: Instruction must authorise partial payment (/PARTIAL/YES, URC 522 art. 19). Then MT410 (2 s), MT400 for half the amount (5 s) + MT202 (6 s). The collection stays PARTIALLY_PAID.
     group: coll-remit
     reactions:
       - messageTypes: [MT499]

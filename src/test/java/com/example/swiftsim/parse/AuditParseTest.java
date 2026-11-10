@@ -14,6 +14,26 @@ class AuditParseTest {
     private final MxHandler mx = new MxHandler();
 
     @Test
+    void currencyExponentsAreStable() {
+        assertEquals(0, Iso4217.exponent("CLP"));
+        assertEquals(0, Iso4217.exponent("JPY"));
+        assertEquals(2, Iso4217.exponent("USD"));
+        assertEquals(2, Iso4217.exponent("KES"));
+        assertEquals(2, Iso4217.exponent("RUB"));
+        assertEquals(2, Iso4217.exponent("NOK"));
+        assertEquals(3, Iso4217.exponent("KWD"));
+        assertNull(Iso4217.exponent("ZZZ"));
+    }
+
+    @Test
+    void mt103Field32AParses() {
+        ParsedMessage pm = mt.parse(fin("103", ":20:PAY1\n:21:GTEE1\n:23B:CRED\n:32A:261110USD30000,00\n:50K:/1234567890\nORDERING CUSTOMER\n:59:/9876543210\nBENEFICIARY CUSTOMER\n:71A:SHA"));
+        assertTrue(pm.getErrors().stream().noneMatch(e -> e.startsWith("SIM-F") || e.startsWith("SIM-M")), pm.getErrors().toString());
+        assertEquals("USD", pm.getVars().get("currency"));
+        assertTrue(pm.getVars().get("amount").startsWith("30000"), pm.getVars().toString());
+    }
+
+    @Test
     void february31IsRejected() {
         ParsedMessage pm = mt.parse(fin("760", ":15A:\n:27:1/1\n:22A:ISSU\n:15B:\n:20:REF1\n:30:260231\n:22D:DGAR\n:40C:URDG\n:23B:FIXD\n:31E:271231\n:52A:TSTAKEN0XXX\n:59:BEN\n:32B:USD1,00\n:77U:TERMS"));
         assertTrue(pm.getErrors().stream().anyMatch(e -> e.contains("SIM-F03") && e.contains("260231")), pm.getErrors().toString());

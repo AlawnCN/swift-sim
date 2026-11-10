@@ -39,3 +39,32 @@ lcheck("K8 continuation stored", KB, lambda d: "CONTINUATION" in events(d) and d
 
 check("K9 positive pacs.008 sample ACK", lambda: post(sample("pacs.008-customer-payment.xml")), [], forbid=("NAK",), wait=2)
 check("K9 positive pacs.009 COV sample ACK", lambda: post(sample("pacs.009-cov-cover.xml")), [], forbid=("NAK",), wait=2)
+
+KM = R("KM1")
+check("K10 standby for MT103", lambda: post(sample("mt760-standby-to-advising.fin", {"KESBLC2026000001": KM})), [("MT768", f":21:{KM}")])
+check("K10 demand of 120000", trig("demand-paid", ref=KM), [("MT765", f":20:{KM}")])
+lcheck("K10 demand received", KM, lambda d: d["demands"][-1]["amount"] == 120000 and d["outstanding"] == 120000)
+check("K10 MT103 pays 30000 of 120000", bare("103", "SUT_BANK", "BENEFICIARY_BANK",
+      f":20:{R('M3')}\n:21:{KM}\n:23B:CRED\n:32A:{TODAY:%y%m%d}USD30000,00\n:50K:/1234567890\nORDERING CUSTOMER\n:59:/9876543210\nBENEFICIARY CUSTOMER\n:71A:SHA"),
+      [], forbid=("NAK",), wait=4)
+lcheck("K10 PARTIALLY_PAID paid 30000 outstanding 90000", KM, lambda d: d["status"] == "PARTIALLY_PAID" and d["outstanding"] == 90000
+       and d["demands"][-1]["status"] == "PARTIALLY_PAID" and d["demands"][-1]["paidAmount"] == 30000)
+
+# A presentation that is already booked must not be counted again when a later claim cannot be tied to it.
+LX, PR, CLX = R("LX1"), R("PR1"), R("CL1")
+check("K11 issue LC", lambda: post(sample("mt700-lc-issue-to-advising.fin", {"KELC2026000001": LX})), [("MT730", f":21:{LX}")])
+check("K11 authorise reimbursement", lambda: post(sample("mt740-lc-reimb-auth.fin", {"KELC2026000001": LX})), [], forbid=(( "MT759", "BIZ-"),), wait=3)
+check("K11 presentation 40000", lambda: post(
+    f":20:{PR}\n:21:{LX}\n:32A:{TODAY:%y%m%d}USD40000,00\n:72Z:DOCUMENTS COMPLY",
+    **{"from": "ADVISING_BANK", "to": "SUT_BANK", "mtType": "754"}), [], forbid=(("MT759", "BIZ-"),), wait=3)
+check("K11 issuer pays presentation", lambda: post(
+    f":20:{R('PY')}\n:21:{PR}\n:32B:USD40000,00\n:33A:{TODAY:%y%m%d}USD40000,00",
+    **{"from": "SUT_BANK", "to": "ADVISING_BANK", "mtType": "756"}), [], forbid=(("MT759", "BIZ-"),), wait=3)
+tcheck("K11 utilised 40000 after the drawing", lcd, LX, lambda d: d["utilised"] == 40000)
+activate("lc-reimb-pays")
+check("K11 claim with a different principal", lambda: post(
+    f":20:{CLX}\n:21:{LX}\n:31C:261030\n:52A:{SUT}\n:32B:USD10000,00\n:34A:{TODAY:%y%m%d}USD10500,00",
+    **{"from": "ADVISING_BANK", "to": "REIMBURSING_BANK", "mtType": "742", "scenario": "lc-reimb-pays"}),
+      [("MT202", f":21:{CLX}")], wait=8)
+tcheck("K11 ambiguous claim does not book a second utilisation", lcd, LX,
+       lambda d: d["utilised"] == 40000 and any("could not be linked uniquely" in (e.get("detail") or "") for e in d["history"]))

@@ -785,12 +785,13 @@ public class LcLedgerService implements TradeLedger {
                         it.setPaidAmount(amt);
                         it.setResolutionMessageId(rec.getId());
                         it.setResolvedAt(Instant.now());
-                        bookClaim(lc, it, v, rec);
+                        String unlink = bookClaim(lc, it, v, rec);
                         items.save(it);
                         lc.setMilestone("REIMBURSED");
                         save(lc, rec);
                         ts.movement(K, lc.getId(), "REIMBURSEMENT", lc.getCurrency(), amt, z(lc.getReimbAmount()).subtract(z(lc.getReimbClaimed())), rec, it.getPresentationRef(), "reimbursing bank paid the claim");
-                        ts.event(K, lc.getId(), lc.getRef(), "REIMBURSED", from, lc.getStatus(), rec, "claim " + it.getPresentationRef() + " reimbursed " + lc.getCurrency() + " " + sw(amt) + " by " + sender + " (" + pm.getShortType() + ")");
+                        ts.event(K, lc.getId(), lc.getRef(), "REIMBURSED", from, lc.getStatus(), rec, "claim " + it.getPresentationRef() + " reimbursed " + lc.getCurrency() + " " + sw(amt) + " by " + sender + " (" + pm.getShortType() + ")"
+                                + (unlink == null ? "" : "; " + unlink));
                     } else if ("PAID".equals(it.getStatus())) {
                         save(lc, rec);
                         ts.event(K, lc.getId(), lc.getRef(), "COVER_RECEIVED", from, lc.getStatus(), rec, pm.getShortType() + " cover for presentation " + it.getPresentationRef() + " " + lc.getCurrency() + " " + sw(amt));
@@ -840,21 +841,34 @@ public class LcLedgerService implements TradeLedger {
     /**
      * Tie an MT742 to one presentation. An explicit /PRESREF/ (or the same reference) wins.
      * Otherwise a single same-presenter presentation for the same principal is used.
-     * Another presentation from the same bank does not, by itself, decide this claim's exposure.
-     * Exposure booked from the claim alone is field 32B (principal), not 34a (principal + charges).
+     * Field 32B is booked only when that claimant has no presentation left to attach.
+     * If presentations exist but none can be linked uniquely, utilisation is not booked again.
+     * @return a note when utilisation was deliberately not booked, otherwise null
      */
-    private void bookClaim(DocCredit lc, LcPresentation claim, Map<String, String> v, MessageRecord rec) {
+    private String bookClaim(DocCredit lc, LcPresentation claim, Map<String, String> v, MessageRecord rec) {
+        List<LcPresentation> open = items.findByLcIdOrderByIdAsc(lc.getId()).stream()
+                .filter(p -> "PRESENTATION".equals(p.getKind())
+                        && claim.getPresenterBic().equals(p.getPresenterBic())
+                        && !"REFUSED".equals(p.getStatus())
+                        && p.getLinkedClaimRef() == null)
+                .toList();
         LcPresentation linked = linkedPresentation(lc, claim, v);
-        BigDecimal principal = claim.getPrincipalAmount() != null ? claim.getPrincipalAmount() : claim.getAmount();
         if (linked != null) {
             claim.setLinkedPresentationRef(linked.getPresentationRef());
             linked.setLinkedClaimRef(claim.getPresentationRef());
             if (!Boolean.TRUE.equals(linked.getUtilisationBooked()))
                 bookAmount(lc, linked, z(linked.getAmount()), rec, "reimbursement of linked presentation " + linked.getPresentationRef());
             items.save(linked);
-        } else {
-            bookAmount(lc, claim, z(principal), rec, "reimbursement claim paid with no linked presentation; utilisation is principal 32B");
+            return null;
         }
+        if (open.isEmpty()) {
+            BigDecimal principal = claim.getPrincipalAmount() != null ? claim.getPrincipalAmount() : claim.getAmount();
+            bookAmount(lc, claim, z(principal), rec, "reimbursement claim paid with no presentation to attach; utilisation is principal 32B");
+            return null;
+        }
+        String refs = open.stream().map(LcPresentation::getPresentationRef).reduce((a, b) -> a + ", " + b).orElse("");
+        return "utilisation not booked: " + open.size() + " presentation(s) from " + claim.getPresenterBic()
+                + " (" + refs + ") could not be linked uniquely to claim " + claim.getPresentationRef();
     }
 
     private LcPresentation linkedPresentation(DocCredit lc, LcPresentation claim, Map<String, String> v) {

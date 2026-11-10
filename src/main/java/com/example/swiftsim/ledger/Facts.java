@@ -132,7 +132,8 @@ class Facts {
                     f.demandAmount = mtAmount(v.get("f32B"));
                     f.currency = mtCurrency(v.get("f32B"), false);
                 }
-                case "MT202" -> {
+                case "MT202", "MT103" -> {
+                    // both carry the settled amount in 32A (value date + currency + amount)
                     f.amount = mtAmount(v.get("f32A"));
                     f.currency = mtCurrency(v.get("f32A"), true);
                 }

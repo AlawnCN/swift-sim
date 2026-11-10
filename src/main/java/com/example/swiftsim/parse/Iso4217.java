@@ -12,44 +12,23 @@ public final class Iso4217 {
     private static final Map<String, Integer> EXP = new HashMap<>();
 
     static {
-        // exponent 2 unless noted. Codes grouped for readability.
-        put(2, "USD EUR GBP AUD CAD CHF CNY HKD SGD SEK NOK DKK NZD ZAR AED SAR QAR INR PKR BDT LKR THB MYR PHP TWD "
-                + "KES TZS NGN GHS EGP MAD ETB MUR ZMW MWK BWP NAD SZL LSL MZN AOA SCR SOS SDG SSP RON PLN CZK HUF TRY "
-                + "ILS JOD BRL MXN ARS COP PEN CLP UYU BOB PYG DOP GTQ HNL NIO CRC PAB BSD BBD BMD KYD XCD AWG ANG "
-                + "FJD WST TOP SBD VUV PGK NPR AFN ALL AMD AZN BAM BGN BHD GEL HRK MDL MKD RSD UAH GMD GNF HTG IQD "
-                + "IRR KGS KHR KPW KZT LAK LBP LRD LYD MGA MMK MNT MRO MRU MVR NIO OMR QAR RWF SLL STD STN SYP TJS "
-                + "TMT TND UZS VEF VES YER ZWL CUC CUP CVE FKP GIP SHP SSP SVC WST XAG XAU XPD XPT");
-        // The line above includes some 0- and 3-exponent codes by mistake if I used one put. Override below.
-        put(0, "JPY KRW VND XOF XAF XPF UGX RWF BIF DJF GNF KMF PYG CLP ISK VUV XAU XAG XPD XPT UYI");
-        put(3, "BHD KWD OMR JOD TND IQD LYD");
+        put(0, "BIF CLP DJF GNF ISK JPY KMF KRW PYG RWF UGX UYI VND VUV XAF XAG XAU XOF XPD XPF XPT");
+        put(3, "BHD IQD JOD KWD LYD OMR TND");
         put(4, "CLF UYW");
-        // re-assert the ones the exponent-2 list may have overwritten incorrectly
-        put(2, "CLP"); // wait CLP is 0. Fix explicitly:
-        EXP.put("CLP", 0);
-        EXP.put("PYG", 0);
-        EXP.put("GNF", 0);
-        EXP.put("RWF", 0);
-        EXP.put("VUV", 0);
-        EXP.put("IQD", 3);
-        EXP.put("LYD", 3);
-        EXP.put("OMR", 3);
-        EXP.put("TND", 3);
-        EXP.put("BHD", 3);
-        EXP.put("JOD", 3);
-        EXP.put("KWD", 3);
-        EXP.put("IDR", 2);
-        EXP.put("KHR", 2);
-        EXP.put("MGA", 2); // ISO exponent is 2 (ariary); some sources say 1/5. Use 2.
-        // Kenya and neighbours explicitly
-        EXP.put("KES", 2);
-        EXP.put("TZS", 2);
-        EXP.put("UGX", 0);
+        put(2, "AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BMD BOB BRL BSD BTN BWP CAD CDF CHF CNY COP CRC CUC CUP CVE CZK "
+                + "DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GTQ GYD HKD HNL HRK HTG HUF IDR ILS INR IRR JMD KES KGS KHR KPW KZT KYD "
+                + "LAK LBP LKR LRD LSL MAD MDL MGA MKD MMK MNT MOP MRO MRU MUR MVR MWK MXN MYR MZN NAD NGN NIO NOK NPR NZD PAB PEN PGK PHP PKR PLN "
+                + "QAR RON RSD RUB SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD SSP STD STN SVC SYP SZL THB TJS TMT TOP TRY TTD TWD TZS UAH UYU "
+                + "USD UZS VES VEF WST XCD YER ZAR ZMW ZWL");
     }
 
     private Iso4217() {}
 
     private static void put(int exp, String codes) {
-        for (String c : codes.trim().split("\\s+")) if (!c.isEmpty()) EXP.put(c, exp);
+        for (String c : codes.trim().split("\\s+")) {
+            if (c.isEmpty()) continue;
+            if (EXP.put(c, exp) != null) throw new IllegalStateException("duplicate ISO 4217 code " + c);
+        }
     }
 
     public static Integer exponent(String ccy) {

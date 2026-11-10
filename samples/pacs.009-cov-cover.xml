@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload>
+<AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.02">
+  <Fr><FIId><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></FIId></Fr>
+  <To><FIId><FinInstnId><BICFI>TSTDKEN0XXX</BICFI></FinInstnId></FIId></To>
+  <BizMsgIdr>PACS9COV00001</BizMsgIdr>
+  <MsgDefIdr>pacs.009.001.08</MsgDefIdr>
+  <BizSvc>swift.cbprplus.cov.02</BizSvc>
+  <CreDt>2026-11-10T08:00:00Z</CreDt>
+</AppHdr>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.009.001.08">
+  <FICdtTrf>
+    <GrpHdr>
+      <MsgId>PACS9COV00001</MsgId>
+      <CreDtTm>2026-11-10T08:00:00Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf><SttlmMtd>INDA</SttlmMtd></SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <InstrId>PACS9COV00001</InstrId>
+        <EndToEndId>KELC2026000001</EndToEndId>
+        <UETR>c9bf9e57-1685-4c89-bafb-ff5af830be8a</UETR>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="USD">40000.00</IntrBkSttlmAmt>
+      <IntrBkSttlmDt>2026-11-10</IntrBkSttlmDt>
+      <InstgAgt><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></InstgAgt>
+      <InstdAgt><FinInstnId><BICFI>TSTCKEN0XXX</BICFI></FinInstnId></InstdAgt>
+      <Dbtr><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></Dbtr>
+      <Cdtr><FinInstnId><BICFI>TSTCKEN0XXX</BICFI></FinInstnId></Cdtr>
+      <UndrlygCstmrCdtTrf>
+        <Dbtr><Nm>KENYA IMPORTS LTD</Nm></Dbtr>
+        <DbtrAgt><FinInstnId><BICFI>TSTBGB20XXX</BICFI></FinInstnId></DbtrAgt>
+        <CdtrAgt><FinInstnId><BICFI>TSTCKEN0XXX</BICFI></FinInstnId></CdtrAgt>
+        <Cdtr><Nm>EXAMPLE SUPPLIES LTD</Nm></Cdtr>
+      </UndrlygCstmrCdtTrf>
+    </CdtTrfTxInf>
+  </FICdtTrf>
+</Document>
+</RequestPayload>

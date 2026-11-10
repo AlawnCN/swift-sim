@@ -5,6 +5,7 @@ import com.example.swiftsim.parse.ParsedMessage;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.util.Map;
 
 /** Business facts extracted from an MT or MX message, normalised for the ledger. */
@@ -23,7 +24,8 @@ class Facts {
     /** MT769 32B amount of charges (when 33B carries the reduction) */
     BigDecimal charges;
 
-    private static final DateTimeFormatter YYMMDD = DateTimeFormatter.ofPattern("uuMMdd");
+    /** STRICT so 31 Feb is rejected rather than rolled to 28 Feb (ResolverStyle.SMART). */
+    private static final DateTimeFormatter YYMMDD = DateTimeFormatter.ofPattern("uuMMdd").withResolverStyle(ResolverStyle.STRICT);
 
     static BigDecimal mtAmount(String s) {
         if (s == null) return null;

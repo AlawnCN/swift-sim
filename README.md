@@ -53,11 +53,13 @@
 
 ```bash
 cd /workspace/swift-sim
-mvn -B -DskipTests package      # 生成 target/swift-sim-0.1.0.jar
-./run.sh                        # nohup 后台启动 8080/8081/8082，日志 data/app.log，PID data/app.pid；打印地址和凭据文件路径
+mvn -B package                  # 跑测试，生成 jar，并在 target/ 写出可解压运行的 tar.gz
+./run.sh                        # 源码目录启动，默认仍只听 127.0.0.1
 ./stop.sh                       # 停止
 python3 tests/e2e.py            # 端到端测试（服务需已启动）
 ```
+
+`mvn package`（以及 `mvn clean package`）在构建机上完成发行包。默认产物是 `target/swift-sim-0.1.0-linux-x86_64.tar.gz`：内含 Linux x86_64 的 Java 21，运行时由构建机下载，部署机解压后执行 `./run.sh` / `./stop.sh`，不再下载。跳过发行包：`mvn package -Dswift.skip.dist=true`。其他系统的 JRE 或精简包见下文。
 
 * 默认只监听 `127.0.0.1:8080`（`application.yml` 中 `server.address`）；如需局域网访问见下文「部署 / 监听地址」。
 * Web UI：<http://localhost:8080/>（报文日志、按交易参考号过滤、查看原文/NAK 原因、激活/触发场景、以任意参与行身份发报、加载样例）。
@@ -155,21 +157,25 @@ python3 tests/e2e.py            # 端到端测试（服务需已启动）
 
 **源码目录**里直接 `./run.sh` 时，三个端口（8080 网关、8081 管理端、8082 AI API）仍按 `application.yml` **只绑定 `127.0.0.1`**。
 
-**发行包**（`tools/package-release.sh` 打出的 tar.gz）解压后执行 `./run.sh`，三个端口**默认绑定 `0.0.0.0`**，供可信局域网访问。包内有中文 `使用说明.txt`。完整包自带 Linux x86_64 的 Java 21，目标机器不需要 Maven 或再下载依赖。`*-slim.tar.gz` 不含 Java，必须本机已有 Java 21，不要把它当成免安装包。
+**发行包**由构建机上的 `mvn package` 直接生成，不必再跑别的打包脚本。默认产物 `target/swift-sim-0.1.0-linux-x86_64.tar.gz` 解压后执行 `./run.sh`，三个端口**默认绑定 `0.0.0.0`**。包内有中文 `使用说明.txt` 和 Linux x86_64 的 Java 21。这个 Java 是构建机在打包时下载的，部署机不需要 Maven，也不再下载运行时。
 
 ```bash
-# 在有 Maven 的机器上打包（自动下载的运行时只限 linux x86_64）
-tools/package-release.sh
-# 其他架构：自行准备该系统的 Java 21 JRE 再打
-# tools/package-release.sh --runtime-dir /path/to/jre --os linux --arch aarch64
-# 不含 Java 的精简包：
-# tools/package-release.sh --slim
-
-tar -xzf dist/swift-sim-*-linux-x86_64.tar.gz
+mvn -B package
+tar -xzf target/swift-sim-0.1.0-linux-x86_64.tar.gz
 cd swift-sim
 ./run.sh
 ./stop.sh
 ```
+
+可选覆盖（仍是同一次 `mvn package`，不是额外步骤）：
+
+```bash
+mvn package -Dswift.skip.dist=true
+mvn package -Dswift.dist.slim=true
+mvn package -Dswift.runtime.dir=/path/to/jre -Dswift.dist.os=linux -Dswift.dist.arch=aarch64
+```
+
+`swift.dist.slim=true` 的包不含 Java，必须目标机器已有 Java 21，不要把它当成免安装包。自动下载的运行时只限构建机是 Linux x86_64 的情况；其他架构请用 `-Dswift.runtime.dir` 指向已经解压好的 Java 21。`tools/package-release.sh` 只是 Maven 调用的组装步骤，不要单独把它当作打包入口。
 
 局域网地址（`<host>` 为服务器 IP）：网关 `http://<host>:8080`、管理端 `http://<host>:8081`、AI API `http://<host>:8082/ai/v1`。
 

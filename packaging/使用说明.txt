@@ -5,10 +5,10 @@ SWIFT 报文模拟器 — 发行包使用说明
 带 runtime 目录的包已经包含 Java 21，部署机不必再安装 Java。
 文件名里带 slim 的包不含 Java，必须本机已有 Java 21，它不是独立运行的完整包。
 
-系统和架构写在 PACKAGE.txt。本发行脚本默认打出的完整包是 Linux x86_64。
+系统和架构写在 PACKAGE.txt。构建机执行 `mvn package` 时，默认打出的完整包是 Linux x86_64，运行时在构建机下载。
 不要把在 x86_64 上打出来的 runtime 拷到 aarch64 或 macOS 上使用。
-其他系统请在对应机器上用 tools/package-release.sh --runtime-dir <已解压的 Java 21 JRE> 重新打包，
-或使用 --slim，然后在目标机器上安装 Java 21。
+其他系统在构建机上执行 `mvn package -Dswift.runtime.dir=<已解压的 Java 21 JRE> -Dswift.dist.os=linux -Dswift.dist.arch=aarch64`。
+不含 Java 的包是 `mvn package -Dswift.dist.slim=true`，目标机器需要自己安装 Java 21。
 
 1. 解压并启动
 --------------

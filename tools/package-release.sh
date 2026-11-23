@@ -1,50 +1,48 @@
 #!/usr/bin/env bash
-# Build a deployment tar.gz on a machine that has Maven and JDK.
-# The machine that later runs the tar.gz does not need Maven, Git, or a source checkout.
+# Assemble target/swift-sim-<version>-*.tar.gz from the jar Maven already built.
+# Invoked by the package phase (exec-maven-plugin). This script must not run Maven.
 #
-#   tools/package-release.sh
-#       linux x86_64 only: download Temurin 21 JRE and produce
-#       dist/swift-sim-<version>-linux-x86_64.tar.gz
-#       (bundled runtime; this is the standalone package)
+# Default (linux x86_64 builder): download a Temurin 21 JRE on the build machine and
+# write target/swift-sim-<version>-linux-x86_64.tar.gz.
+# The machine that later unpacks that archive does not download anything.
 #
-#   tools/package-release.sh --slim
-#       dist/swift-sim-<version>-slim.tar.gz
-#       no Java inside. Requires Java 21 on the target. Not a standalone package.
-#
-#   tools/package-release.sh --runtime-dir /path/to/extracted-jre
-#       bundle that JRE instead of downloading one. Use this for linux aarch64 or a JRE
-#       you unpacked yourself. The script records os/arch from `uname` of THIS builder
-#       only when it downloads; with --runtime-dir it records the java binary's reported
-#       version and you must pass --os and --arch to label the archive.
-#
-#   --os linux --arch aarch64     labels used with --runtime-dir (default: this machine)
-#   --skip-build                  use the existing target/swift-sim-*.jar
+# Optional, same as the Maven properties:
+#   SWIFT_RUNTIME_DIR / --runtime-dir   use this extracted Java 21 JRE instead of downloading
+#   SWIFT_DIST_OS / --os                label used with --runtime-dir
+#   SWIFT_DIST_ARCH / --arch
+#   SWIFT_DIST_SLIM=true / --slim       archive without a JRE (not standalone)
+#   --skip-build                        accepted and ignored
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
+normalize_arch() {
+  case "$1" in
+    x86_64|amd64) printf 'x86_64' ;;
+    aarch64|arm64) printf 'aarch64' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 SLIM=0
-SKIP_BUILD=0
-RUNTIME_DIR=""
-OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH_NAME=$(uname -m)
-case "$ARCH_NAME" in
-  x86_64|amd64) ARCH_NAME=x86_64 ;;
-  aarch64|arm64) ARCH_NAME=aarch64 ;;
-esac
+RUNTIME_DIR=${SWIFT_RUNTIME_DIR:-}
+OS_NAME=${SWIFT_DIST_OS:-$(uname -s | tr '[:upper:]' '[:lower:]')}
+ARCH_NAME=${SWIFT_DIST_ARCH:-$(uname -m)}
+[[ "${SWIFT_DIST_SLIM:-}" == "true" ]] && SLIM=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slim) SLIM=1; shift ;;
-    --skip-build) SKIP_BUILD=1; shift ;;
-    --runtime-dir) RUNTIME_DIR=${2:?}; shift 2 ;;
+    --skip-build) shift ;;
+    --runtime-dir) RUNTIME_DIR=${2:-}; shift 2 ;;
     --os) OS_NAME=${2:?}; shift 2 ;;
     --arch) ARCH_NAME=${2:?}; shift 2 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+ARCH_NAME=$(normalize_arch "$ARCH_NAME")
 
 if [[ "$SLIM" -eq 1 && -n "$RUNTIME_DIR" ]]; then
   echo "--slim and --runtime-dir cannot be used together" >&2
@@ -61,10 +59,8 @@ VERSION=$(awk '
 ' pom.xml)
 [[ -n "$VERSION" ]] || { echo "cannot read version from pom.xml" >&2; exit 1; }
 
-if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  mvn -B -DskipTests package
-fi
-JAR=$(ls -1 target/swift-sim-*.jar | grep -v '\.original$' | head -n 1)
+# The jar is produced earlier in the same Maven package phase. Never invoke Maven here.
+JAR=$(ls -1 target/swift-sim-*.jar 2>/dev/null | grep -v '\.original$' | head -n 1 || true)
 [[ -n "$JAR" && -f "$JAR" ]] || { echo "missing target/swift-sim-*.jar" >&2; exit 1; }
 
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/swift-sim-stage.XXXXXX")
@@ -158,11 +154,11 @@ if [[ -e "$DEST/config/secrets" ]] || [[ -e "$DEST/data" ]] || [[ -e "$DEST/targ
   echo "refusing to ship secrets, data, or build output inside the archive" >&2
   exit 1
 fi
-mkdir -p "$ROOT/dist"
-OUT="$ROOT/dist/swift-sim-${VERSION}-${NAME_SUFFIX}.tar.gz"
+mkdir -p "$ROOT/target"
+OUT="$ROOT/target/swift-sim-${VERSION}-${NAME_SUFFIX}.tar.gz"
 tar -C "$STAGE" -czf "$OUT" swift-sim
 (
-  cd "$ROOT/dist"
+  cd "$ROOT/target"
   sha256sum "$(basename "$OUT")" | tee "$(basename "$OUT").sha256"
 )
 echo "wrote $OUT"

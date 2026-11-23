@@ -2,6 +2,7 @@ package com.example.swiftsim.ops;
 
 import com.example.swiftsim.domain.MessageRecord;
 import com.example.swiftsim.domain.MessageRepository;
+import com.example.swiftsim.files.FileTransportService;
 import com.example.swiftsim.gateway.GatewayService;
 import com.example.swiftsim.gateway.SubmitOptions;
 import com.example.swiftsim.gateway.SubmitResult;
@@ -39,6 +40,7 @@ public class AdminController {
     private final OpsProps props;
     private final PurgeService purge;
     private final GatewayService gateway;
+    private final FileTransportService fileTransport;
     private final ReviewService review;
     private final MessageRepository messages;
     private final JdbcTemplate jdbc;
@@ -138,7 +140,7 @@ public class AdminController {
     @PostMapping("/send")
     public ResponseEntity<SubmitResult> send(@RequestBody Map<String, String> body) {
         SubmitResult r = gateway.submit(body.get("raw"), SubmitOptions.builder().channel("ADMIN").from(blank(body.get("from"))).to(blank(body.get("to")))
-                .mtType(blank(body.get("mtType"))).scenario(blank(body.get("scenario"))).build());
+                .mtType(blank(body.get("mtType"))).scenario(blank(body.get("scenario"))).outboundTransport(blank(body.get("transport"))).build());
         return ResponseEntity.status("ACK".equals(r.getStatus()) ? HttpStatus.ACCEPTED : HttpStatus.UNPROCESSABLE_ENTITY).body(r);
     }
 
@@ -254,6 +256,21 @@ public class AdminController {
     public Map<String, Object> purge(@RequestBody Map<String, Object> body) {
         boolean dry = !Boolean.FALSE.equals(body.get("dryRun"));
         return purge.purge(body, dry);
+    }
+
+    /** Payment-application folder transport. Paths are named from the application's point of view. */
+    @GetMapping("/transport")
+    public Map<String, Object> transport() {
+        return fileTransport.status();
+    }
+
+    @PostMapping("/transport")
+    public ResponseEntity<Map<String, Object>> updateTransport(@RequestBody Map<String, Object> body) {
+        try {
+            return ResponseEntity.ok(fileTransport.update(body));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     private static Long lng(String s) {

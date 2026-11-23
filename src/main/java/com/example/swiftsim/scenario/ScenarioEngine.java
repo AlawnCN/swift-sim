@@ -276,6 +276,11 @@ public class ScenarioEngine {
      * and shared by all steps; ?ref= picks a record explicitly. Returns a short description of what was scheduled.
      */
     public List<String> trigger(String scenarioId, String format, Map<String, String> overrides, String fromOverride, String toOverride) {
+        return trigger(scenarioId, format, overrides, fromOverride, toOverride, null);
+    }
+
+    /** {@code outboundTransport} is HTTP or FILE for simulator-originated kickoff. Null uses the transport originate setting. */
+    public List<String> trigger(String scenarioId, String format, Map<String, String> overrides, String fromOverride, String toOverride, String outboundTransport) {
         Scenario s = cfg.scenario(scenarioId).orElseThrow(() -> new NoSuchElementException("unknown scenario " + scenarioId));
         if (s.getKickoff().isEmpty()) throw new IllegalArgumentException("scenario " + scenarioId + " has no kickoff steps; send a message from your system instead");
         String fmt = format == null ? "MT" : format.toUpperCase();
@@ -333,7 +338,7 @@ public class ScenarioEngine {
             eff.setRepeat(st.getRepeat()); eff.setPossibleDuplicate(st.isPossibleDuplicate()); eff.setNote(st.getNote()); eff.setWhen(st.getWhen());
             eff.setFireWhen(st.getFireWhen());
             eff.setFrom(from.getId()); eff.setTo(to.getId());
-            schedule(s, eff, base, fmt, to, from, null, 0, "KICKOFF");
+            schedule(s, eff, base, fmt, to, from, null, 0, "KICKOFF", outboundTransport);
             out.add(st.getDelaySeconds() + "s: " + from.getId() + " -> " + to.getId() + " " + tpl + " ref=" + base.get("ref") + " [" + ctx + "]"
                     + (st.getFireWhen().isEmpty() ? "" : " (only if " + st.getFireWhen() + " when due)"));
         }
@@ -352,6 +357,11 @@ public class ScenarioEngine {
 
     List<Long> schedule(Scenario s, Scenario.Step st, Map<String, String> base, String fmt,
                         Participant inboundSender, Participant inboundReceiver, Long inReplyTo, int depth, String kind) {
+        return schedule(s, st, base, fmt, inboundSender, inboundReceiver, inReplyTo, depth, kind, null);
+    }
+
+    List<Long> schedule(Scenario s, Scenario.Step st, Map<String, String> base, String fmt,
+                        Participant inboundSender, Participant inboundReceiver, Long inReplyTo, int depth, String kind, String outboundTransport) {
         if (st.getNote() != null) gateway.note(base.get("ref"), s.getId(), inReplyTo, st.getNote());
         if (!st.getWhen().isEmpty() && !whenMatches(st.getWhen(), base)) {
             gateway.note(base.get("ref"), s.getId(), inReplyTo, "step " + (st.getMt() != null ? st.getMt() : st.getMx()) + " skipped (step condition " + st.getWhen() + " not met)");
@@ -388,6 +398,7 @@ public class ScenarioEngine {
             p.setGroupKey(group);
             p.setCopyIndex(i);
             p.setRef(trunc(base.get("ref"), 64));
+            p.setOutboundTransport(outboundTransport == null || outboundTransport.isBlank() ? null : outboundTransport.trim().toUpperCase());
             pending.save(p);
             ids.add(p.getId());
             final Long id = p.getId();
@@ -524,7 +535,9 @@ public class ScenarioEngine {
             }
             if (p.isPossibleDuplicate() || p.isRecovered()) raw = GatewayService.asPossibleDuplicate(raw);
             r = gateway.submit(raw, SubmitOptions.builder().channel("SCENARIO").producedBy(p.getScenarioId())
-                    .inReplyTo(p.getInReplyTo()).depth(p.getDepth()).businessReject("BUSINESS_REJECT".equals(p.getKind()) || "REVIEW_REJECT".equals(p.getKind())).build());
+                    .inReplyTo(p.getInReplyTo()).depth(p.getDepth())
+                    .outboundTransport(p.getOutboundTransport())
+                    .businessReject("BUSINESS_REJECT".equals(p.getKind()) || "REVIEW_REJECT".equals(p.getKind())).build());
             if (!"ACK".equals(r.getStatus())) log.warn("scenario {} produced NAKed message: {}", p.getScenarioId(), r.getErrors());
             p.setStatus("DONE");
             p.setResultMessageId(r.getId());

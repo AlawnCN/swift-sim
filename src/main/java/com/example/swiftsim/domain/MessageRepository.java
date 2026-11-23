@@ -15,4 +15,6 @@ public interface MessageRepository extends JpaRepository<MessageRecord, Long>, J
     List<MessageRecord> findForRef(String ref);
 
     boolean existsBySenderBicAndMurAndIdNot(String senderBic, String mur, Long id);
+
+    java.util.Optional<MessageRecord> findByFileClaimId(Long fileClaimId);
 }

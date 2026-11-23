@@ -126,6 +126,7 @@ public class OpsService {
         if (m.getMur() != null) x.put("mur", m.getMur());
         if (Boolean.TRUE.equals(m.getPossibleDuplicate())) { x.put("possibleDuplicate", true); x.put("duplicateOf", m.getDuplicateOf()); }
         if (m.getWarnings() != null) x.put("warnings", List.of(m.getWarnings().split("\n")));
+        if (m.getOutboundTransport() != null) x.put("outboundTransport", m.getOutboundTransport());
         return x;
     }
 

@@ -30,7 +30,7 @@ function msgRow(m) {
 const MSGHEAD = '<tr><th>#</th><th>时间</th><th>方向</th><th>类型</th><th>发报行</th><th>收报行</th><th>20</th><th>21</th><th>网关</th><th>业务</th></tr>';
 
 // ---------------------------------------------------------------------------------------------- router
-const routes = {dash, msgs, ledger, review, parts, scen, compose, logs, audit, tools};
+const routes = {dash, msgs, ledger, review, parts, transport, scen, compose, logs, audit, tools};
 async function route() {
   if (logTimer) { clearInterval(logTimer); logTimer = null; }
   const [name, arg] = (location.hash.slice(1) || 'dash').split('/');
@@ -50,7 +50,7 @@ async function logout() { await api('/admin/api/logout', {method: 'POST'}); loca
 
 // ---------------------------------------------------------------------------------------------- dashboard
 async function dash() {
-  const d = await api('/admin/api/dashboard');
+  const [d, t] = await Promise.all([api('/admin/api/dashboard'), api('/admin/api/transport')]);
   const led = Object.entries(d.ledgers).map(([k, v]) => `<div class="stat"><span class="muted">${{UNDERTAKING: '保函/备用证', LC: '信用证', COLL: '托收'}[k]}</span><b>${v.total}</b>${Object.entries(v.byStatus).map(([s, n]) => `<span class="badge">${esc(s)} ${n}</span>`).join('')}</div>`).join('');
   M().innerHTML = `<h2>概览 <span class="muted small">营业日 ${esc(d.businessDate)}${d.businessDateOverride ? ' (已覆盖)' : ''}</span></h2>
   <div class="grid">
@@ -59,7 +59,48 @@ async function dash() {
    <div class="stat"><span class="muted">计划中的自动回复</span><b>${d.scheduledResponses}</b>机构数 ${d.participants}</div>${led}</div>
   <div class="split" style="margin-top:12px"><div class="card"><h3>FIN 会话 / 序号 (ISN/OSN)</h3><table><tr><th>BIC</th><th>会话</th><th>ISN</th><th>OSN</th></tr>${d.sessions.map(s => `<tr><td>${esc(s.bic)}</td><td>${s.sessionNo}</td><td>${s.lastIsn}</td><td>${s.lastOsn}</td></tr>`).join('')}</table></div>
   <div class="card"><h3>当前激活场景</h3>${Object.entries(d.activeScenarios).map(([g, s]) => `<div><span class="muted">${esc(g)}</span>: ${esc(s)}</div>`).join('')}</div></div>
-  <div class="card"><h3>最近报文</h3><table>${MSGHEAD}${d.recent.map(msgRow).join('')}</table></div>`;
+  <div class="card"><h3>最近报文</h3><table>${MSGHEAD}${d.recent.map(msgRow).join('')}</table></div>
+  <div class="card"><h3>文件传输 <span class="muted small">路径按支付应用视角</span></h3>
+   <div>模式 <b>${esc(t.mode)}</b> · 文件通道 ${t.fileEnabled ? '<span class="badge on">开启</span>' : '<span class="badge">关闭</span>'} · 模拟器主动发报 ${esc(t.originate)}</div>
+   <div class="small muted">根目录 ${esc(t.root || '（未配置，HTTP 模式不会访问任何支付应用目录）')}</div>
+   <div class="small"><a href="#transport">查看路径与状态</a></div></div>`;
+}
+
+// ---------------------------------------------------------------------------------------------- file transport
+function pathRows(t) {
+  return (t.paths || []).map(p => `<tr><td>${esc(p.appView)}</td><td><code>${esc(p.relative)}</code></td><td class="small">${esc(p.absolute || '')}</td><td>${esc(p.role)}</td><td>${p.simulatorAccess === 'NONE' ? '不访问' : (p.probed ? (p.error ? `<span class="sev-ERROR">${esc(p.error)}</span>` : '可读写') : '未探测')}</td></tr>`).join('');
+}
+async function transport() {
+  const t = await api('/admin/api/transport');
+  const errs = (t.recentErrors || []).map(e => `<tr><td>${esc(e.at || '')}</td><td>${esc(e.file)}</td><td>${esc(e.status)}</td><td>${esc(e.messageId)}</td><td class="small">${esc(e.reason || '')}</td></tr>`).join('');
+  const pubs = (t.recentPublications || []).map(e => `<tr><td>${esc(e.messageId)}</td><td>${esc(e.status)}</td><td>${esc(e.msgType || '')}</td><td class="small">${esc(e.file || '')}</td><td class="small">${esc(e.reason || e.path || '')}</td></tr>`).join('');
+  const waiting = (t.waiting || []).map(w => `<div>${esc(w.folder)} ${esc(w.name)} — ${esc(w.reason)}</div>`).join('') || '<span class="muted">无</span>';
+  M().innerHTML = `<h2>文件传输 <span class="muted small">同一进程里的网关在收发；本页只配置和查看。没有 SFTP。</span></h2>
+  <div class="card"><div class="small">${esc(t.routing || '')}</div>
+   <div class="small muted" style="margin-top:6px">${esc(t.guarantees || '')}</div>
+   ${t.disabledNote ? `<div class="small" style="margin-top:6px">${esc(t.disabledNote)}</div>` : ''}
+   ${t.layoutError ? `<div class="sev-ERROR">${esc(t.layoutError)}</div>` : ''}
+   ${(t.diagnostics || []).filter(x => x && !String(x).startsWith('file transport disabled')).map(x => `<div class="sev-ERROR">${esc(x)}</div>`).join('')}
+   <div class="small muted">上次轮询 ${esc(t.lastPollAt || '—')} · 轮询 ${esc(t.pollMs)} ms · 稳定等待 ${esc(t.stableMs)} ms · 上次错误 ${esc(t.lastError || '无')}</div></div>
+  <div class="card"><h3>目录（支付应用视角）</h3>
+   <table><tr><th>支付应用</th><th>相对路径</th><th>绝对路径</th><th>角色</th><th>状态</th></tr>${pathRows(t)}</table>
+   <div class="small muted">计数 ${esc(JSON.stringify(t.counts || {}))} · 跳过的不安全路径 ${esc(t.skippedUnsafe || 0)}</div>
+   <h3>仍留在 outgoing 的文件</h3><div class="small">${waiting}</div></div>
+  <div class="card"><h3>配置</h3>
+   <div class="row">模式 <select id="tr_mode">${['HTTP','FILE','BOTH'].map(x => `<option ${t.mode===x?'selected':''}>${x}</option>`).join('')}</select>
+    主动发报 <select id="tr_orig"><option value="" ${!t.originateConfigured?'selected':''}>自动</option><option ${t.originateConfigured==='HTTP'?'selected':''}>HTTP</option><option ${t.originateConfigured==='FILE'?'selected':''}>FILE</option></select></div>
+   <div class="row">支付应用根目录 <input id="tr_root" size="48" placeholder="/path/to/kenex" value="${esc(t.root || '')}"></div>
+   <div class="row">模拟器状态目录（空 = &lt;根&gt;/.swiftsim） <input id="tr_state" size="40" value="${esc(t.stateDir || '')}"></div>
+   <div class="row">轮询 ms <input id="tr_poll" size="6" value="${esc(t.pollMs)}"> 稳定等待 ms <input id="tr_stable" size="6" value="${esc(t.stableMs)}"></div>
+   <div class="row"><button onclick="saveTransport()">保存</button> <button class="sec" onclick="transport()">刷新</button></div>
+   <div class="small muted">HTTP：不创建、不扫描支付应用目录。FILE / BOTH：读取 outgoing，成功后把原文件移动到 temp/outgoing（不删除、不另建成功归档根）。要交给支付应用的报文写到 incoming，模拟器不清理 incoming。BOTH 下 HTTP 提交的回复不会再写一份到 incoming。temp/incoming 始终不访问。失败和领取中的文件在 .swiftsim，不进 temp/outgoing。</div></div>
+  <div class="split"><div class="card"><h3>隔离 / 回声</h3><table><tr><th>时间</th><th>文件</th><th>状态</th><th>报文</th><th>原因</th></tr>${errs || '<tr><td colspan="5" class="muted">无</td></tr>'}</table></div>
+  <div class="card"><h3>写出的 incoming 文件</h3><table><tr><th>报文</th><th>状态</th><th>类型</th><th>文件名</th><th>路径 / 原因</th></tr>${pubs || '<tr><td colspan="5" class="muted">无</td></tr>'}</table></div></div>`;
+}
+async function saveTransport() {
+  const r = await api('/admin/api/transport', {method: 'POST', body: {mode: $('#tr_mode').value, originate: $('#tr_orig').value, root: $('#tr_root').value.trim(), stateDir: $('#tr_state').value.trim(), pollMs: $('#tr_poll').value, stableMs: $('#tr_stable').value}});
+  toast('已保存：' + r.mode + (r.fileEnabled ? '，文件通道开启' : '，文件通道关闭'));
+  transport();
 }
 
 // ---------------------------------------------------------------------------------------------- messages
@@ -190,8 +231,11 @@ async function scen() {
   const groups = {};
   l.forEach(s => (groups[s.group || 'default'] = groups[s.group || 'default'] || []).push(s));
   M().innerHTML = `<h2>模拟场景 <span class="muted small">每组一个激活场景决定虚拟行如何回应；带"发起"的场景可由虚拟行主动发起</span></h2>
-  <div class="card"><div class="row">发起参数: 格式 <select id="sc_fmt"><option>MT</option><option>MX</option></select> 编号(可选) <input id="sc_ref" size="18"> 发报方 <select id="sc_from">${partOpts('')}</select> 收报方 <select id="sc_to">${partOpts('')}</select>
-   <input id="sc_q" placeholder="搜索场景" oninput="scFilter()"></div></div>
+  <div class="card"><div class="row">发起参数: 格式 <select id="sc_fmt"><option>MT</option><option>MX</option></select>
+   交给支付应用 <select id="sc_tr"><option value="">自动</option><option>HTTP</option><option>FILE</option></select>
+   编号(可选) <input id="sc_ref" size="18"> 发报方 <select id="sc_from">${partOpts('')}</select> 收报方 <select id="sc_to">${partOpts('')}</select>
+   <input id="sc_q" placeholder="搜索场景" oninput="scFilter()"></div>
+   <div class="small muted">自动：BOTH/HTTP 下主动发报走 originate（默认 HTTP，不写 incoming）；FILE 模式下走文件夹。选 FILE 则本次 kickoff 写到 incoming。</div></div>
   ${Object.entries(groups).map(([g, ss]) => `<div class="card group"><h3>${esc(g)}</h3>${ss.map(s => `<div class="scen ${s.active ? 'active' : ''}" data-q="${esc((s.id + ' ' + s.name + ' ' + (s.description || '')).toLowerCase())}">
    <b>${esc(s.id)}</b> ${esc(s.name)} ${s.active ? '<span class="badge on">激活</span>' : ''}${s.fallback ? '<span class="badge">兜底</span>' : ''} <span class="small muted">响应 ${esc((s.reactsTo || []).join(', '))}</span>
    <span style="float:right">${s.active ? '' : `<button class="sec" onclick="scAct('${esc(s.id)}')">激活</button>`} ${s.hasKickoff ? `<button onclick="scTrig('${esc(s.id)}')">发起</button>` : ''}</span>
@@ -200,7 +244,7 @@ async function scen() {
 function scFilter() { const v = $('#sc_q').value.toLowerCase(); document.querySelectorAll('.scen').forEach(e => e.style.display = e.dataset.q.includes(v) ? '' : 'none'); }
 async function scAct(id) { await api(`/api/scenarios/${encodeURIComponent(id)}/activate`, {method: 'POST'}); toast('已激活 ' + id); scen(); }
 async function scTrig(id) {
-  const r = await api(`/api/scenarios/${encodeURIComponent(id)}/trigger?` + q({format: $('#sc_fmt').value, ref: $('#sc_ref').value.trim(), from: $('#sc_from').value, to: $('#sc_to').value}), {method: 'POST', body: {}});
+  const r = await api(`/api/scenarios/${encodeURIComponent(id)}/trigger?` + q({format: $('#sc_fmt').value, ref: $('#sc_ref').value.trim(), from: $('#sc_from').value, to: $('#sc_to').value, transport: $('#sc_tr').value}), {method: 'POST', body: {}});
   toast('已发起 ' + id + ':\n' + (r.scheduled || []).join('\n'));
 }
 
@@ -209,7 +253,8 @@ async function compose() {
   const c = window._compose || {}; window._compose = null;
   const samples = await api('/api/samples').catch(() => []);
   M().innerHTML = `<h2>发报 / 校验 <span class="muted small">以任一机构(被测系统或虚拟行)身份发报，经过正常网关校验、序号、ACK/NAK、投递、台账与场景</span></h2>
-  <div class="split"><div class="card"><div class="row">发报方 <select id="c_from">${partOpts(c.from)}</select> 收报方 <select id="c_to">${partOpts(c.to)}</select> MT类型(仅裸 block 4) <input id="c_mt" size="5" placeholder="760"></div>
+  <div class="split"><div class="card"><div class="row">发报方 <select id="c_from">${partOpts(c.from)}</select> 收报方 <select id="c_to">${partOpts(c.to)}</select> MT类型(仅裸 block 4) <input id="c_mt" size="5" placeholder="760">
+   回复通道 <select id="c_tr"><option value="">自动</option><option>HTTP</option><option>FILE</option></select></div>
    <div class="row">样例 <select id="c_s"><option value="">(选择样例)</option>${samples.map(s => `<option>${esc(s)}</option>`).join('')}</select> <button class="sec" onclick="loadSample()">载入</button>
     强制场景 <input id="c_sc" size="16" placeholder="可选"></div>
    <textarea id="c_raw" rows="22" placeholder="完整 MT (FIN) / MX (XML+AppHdr) 报文，或以 : 开头的 MT block 4">${esc(c.raw || '')}</textarea>
@@ -217,7 +262,7 @@ async function compose() {
   <div class="card"><h3>结果</h3><div id="c_out" class="muted">—</div></div></div>`;
 }
 async function loadSample() { const n = $('#c_s').value; if (!n) return; $('#c_raw').value = await api('/api/samples/' + encodeURIComponent(n)); }
-function cBody() { return {raw: $('#c_raw').value, from: $('#c_from').value, to: $('#c_to').value, mtType: $('#c_mt').value.trim(), scenario: $('#c_sc').value.trim()}; }
+function cBody() { return {raw: $('#c_raw').value, from: $('#c_from').value, to: $('#c_to').value, mtType: $('#c_mt').value.trim(), scenario: $('#c_sc').value.trim(), transport: $('#c_tr').value}; }
 async function cValidate() {
   const r = await api('/admin/api/validate', {method: 'POST', body: cBody()});
   $('#c_out').innerHTML = `<div class="row"><b>${esc(r.verdict)}</b> ${esc(r.verdict_zh)}</div>${kv(r, ['format', 'msgType', 'sender', 'receiver', 'direction', 'txRef', 'relatedRef'])}

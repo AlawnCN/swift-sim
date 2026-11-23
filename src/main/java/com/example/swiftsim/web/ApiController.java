@@ -47,9 +47,11 @@ public class ApiController {
                                                @RequestParam(required = false) String mtType,
                                                @RequestParam(required = false) String scenario,
                                                @RequestParam(defaultValue = "REST") String channel,
+                                               @RequestParam(required = false) String transport,
                                                @RequestHeader(value = "X-Sim-Scenario", required = false) String scenarioHeader) {
         SubmitResult r = gateway.submit(raw, SubmitOptions.builder().channel(channel).from(blank(from)).to(blank(to))
-                .mtType(blank(mtType)).scenario(blank(scenario) != null ? scenario : blank(scenarioHeader)).build());
+                .mtType(blank(mtType)).scenario(blank(scenario) != null ? scenario : blank(scenarioHeader))
+                .outboundTransport(blank(transport)).build());
         return ResponseEntity.status("ACK".equals(r.getStatus()) ? HttpStatus.ACCEPTED : HttpStatus.UNPROCESSABLE_ENTITY).body(r);
     }
 
@@ -142,9 +144,10 @@ public class ApiController {
     public Map<String, Object> trigger(@PathVariable String id, @RequestParam(defaultValue = "MT") String format,
                                        @RequestParam(required = false) String from, @RequestParam(required = false) String to,
                                        @RequestParam(required = false) String ref,
+                                       @RequestParam(required = false) String transport,
                                        @RequestBody(required = false) Map<String, String> vars) {
         if (ref != null && !ref.isBlank()) { vars = vars == null ? new java.util.HashMap<>() : new java.util.HashMap<>(vars); vars.put("ref", ref.trim()); }
-        return Map.of("scenario", id, "format", format, "scheduled", engine.trigger(id, format, vars, blank(from), blank(to)));
+        return Map.of("scenario", id, "format", format, "scheduled", engine.trigger(id, format, vars, blank(from), blank(to), blank(transport)));
     }
 
     @PostMapping("/admin/reload")

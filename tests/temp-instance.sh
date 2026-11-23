@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Start / stop a throw-away simulator instance for the e2e tests, so the live instance (8080, ./data) is never touched.
 #   tests/temp-instance.sh start|stop|restart|wipe      (env: SIM_TEST_PORT=8090, SIM_TEST_ADMIN_PORT=8091, SIM_TEST_AI_PORT=8092, SIM_TEST_DATA=/tmp/swift-sim-e2e)
+#   SIM_TEST_JAVA_ARGS="--sim.transport.mode=BOTH --sim.transport.file.root=/tmp/kenex"  (no spaces inside values)
 #   SIM_URL=http://127.0.0.1:8090 SIM_DATA_DIR=/tmp/swift-sim-e2e \
 #   SIM_STOP_CMD="tests/temp-instance.sh stop" SIM_START_CMD="tests/temp-instance.sh start" python3 tests/e2e.py
 cd "$(dirname "$0")/.."
@@ -26,7 +27,12 @@ start() {
   mkdir -p "$DATA"
   if [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; then echo "test instance already running"; return; fi
   [ "$DATA" -ef ./data ] && { echo "refusing to use the live data directory"; exit 1; }
-  nohup "$JAVA" -Xms128m -Xmx512m -jar target/swift-sim-0.1.0.jar --server.port="$PORT" --sim.admin.port="$ADMIN_PORT" --sim.ai.port="$AI_PORT" --sim.data-dir="$DATA" --sim.secrets-dir="$DATA/secrets" >> "$DATA/app.log" 2>&1 &
+  extra=()
+  if [ -n "${SIM_TEST_JAVA_ARGS:-}" ]; then
+    # shellcheck disable=SC2206
+    extra=( ${SIM_TEST_JAVA_ARGS} )
+  fi
+  nohup "$JAVA" -Xms128m -Xmx512m -jar target/swift-sim-0.1.0.jar --server.port="$PORT" --sim.admin.port="$ADMIN_PORT" --sim.ai.port="$AI_PORT" --sim.data-dir="$DATA" --sim.secrets-dir="$DATA/secrets" "${extra[@]}" >> "$DATA/app.log" 2>&1 &
   echo $! > "$PIDF"
   for i in $(seq 1 60); do curl -s -m 2 -o /dev/null "http://127.0.0.1:$PORT/api/participants" && break; sleep 1; done
   echo "test instance pid $(cat "$PIDF") -> http://127.0.0.1:$PORT/ admin http://127.0.0.1:$ADMIN_PORT/ ai http://127.0.0.1:$AI_PORT/ai/v1 (data $DATA, secrets $DATA/secrets)"

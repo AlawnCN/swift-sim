@@ -35,6 +35,19 @@ sim:
     address: 127.0.0.1
   secrets-dir: ./config/secrets   # admin-console.properties + ai-api-keys are generated here on first start (chmod 600)
   protected-refs: KEGTEE2026000101  # never selected by the admin purge tool unless explicitly included
+  # Payment-application folder transport. Paths below are from the application's point of view.
+  # outgoing/* is simulator input; incoming/* is simulator output; temp/incoming is never opened.
+  # Default HTTP does not create or scan any of those directories. Example:
+  #   ./run.sh --sim.transport.mode=BOTH --sim.transport.file.root=/path/to/kenex
+  transport:
+    mode: HTTP            # HTTP | FILE | BOTH
+    originate: ""         # HTTP | FILE | empty = FILE when mode is FILE, otherwise HTTP (kickoff / simulator-originated only)
+    file:
+      root: ""            # payment-application root, example /path/to/kenex. Not a home directory.
+      state-dir: ""       # simulator-owned inflight and error only. Empty = <root>/.swiftsim. Success archive is always <root>/temp/outgoing. Never temp/incoming.
+      poll-ms: 2000
+      stable-ms: 1000     # ingest only after size and mtime are unchanged this long; 0 accepts a non-empty file on first sight
+      max-bytes: 2000000
 logging:
   level:
     com.prowidesoftware: WARN

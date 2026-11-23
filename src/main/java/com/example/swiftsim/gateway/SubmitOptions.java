@@ -21,4 +21,11 @@ public class SubmitOptions {
     private int depth;
     /** message is a simulator-generated business reject (ledger only links it, receiver does not react) */
     private boolean businessReject;
+    /**
+     * HTTP or FILE. Null lets {@code FileTransportService} decide: replies follow the inbound message,
+     * folder drops use FILE, and simulator kickoff uses the originate setting.
+     */
+    private String outboundTransport;
+    /** Id of the kenex {@code file_claim} row this submission came from, when channel is FOLDER. */
+    private Long fileClaimId;
 }

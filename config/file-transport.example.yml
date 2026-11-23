@@ -1,0 +1,33 @@
+# Example only. The simulator does NOT load this file.
+# Copy the keys you need into the process as arguments or environment variables.
+# Every path below is from the payment application's point of view.
+#
+#   outgoing/mt , outgoing/mx   application sends these  -> simulator input (application does not clean them)
+#   incoming/mt , incoming/mx   application reads these  -> simulator output (simulator does not clean them)
+#   temp/outgoing/mt , temp/outgoing/mx
+#                               simulator success archive: consumed originals are moved here, not deleted
+#   temp/incoming               application-owned archive of incoming. The simulator never opens it.
+#   .swiftsim/inflight , .swiftsim/error
+#                               simulator-owned only. Not a second success archive.
+#
+# ./run.sh --sim.transport.mode=BOTH --sim.transport.file.root=/path/to/kenex
+#
+# sim.transport.mode=HTTP
+# sim.transport.originate=
+# sim.transport.file.root=/path/to/kenex
+# sim.transport.file.state-dir=
+# sim.transport.file.poll-ms=2000
+# sim.transport.file.stable-ms=1000
+# sim.transport.file.max-bytes=2000000
+#
+# Layout the payment application already uses:
+#
+# /path/to/kenex/outgoing/mt/MT700PYHNHFCY3PUDF7S.txt
+# /path/to/kenex/outgoing/mx/MXPYHNHE327RFJ24G.xml
+# /path/to/kenex/incoming/mt/
+# /path/to/kenex/incoming/mx/
+# /path/to/kenex/temp/outgoing/mt/     # simulator moves a successfully consumed MT here
+# /path/to/kenex/temp/outgoing/mx/
+# /path/to/kenex/temp/incoming/        # payment application only
+# /path/to/kenex/.swiftsim/inflight/   # simulator claim area
+# /path/to/kenex/.swiftsim/error/      # failures and suppressed echoes

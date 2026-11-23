@@ -14,9 +14,12 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * File drop interface: put *.fin / *.txt / *.xml into data/inbox. Each file = one message.
- * Optional routing hint in the file name for MX without AppHdr: name__FROMID__TOID.xml
- * Processed files move to data/inbox/processed (ACK) or data/inbox/error (NAK) with a .result.txt next to them.
+ * File drop interface for the simulator's own {@code data/inbox} (channel FILE). This is not the payment
+ * application's kenex tree: put {@code *.fin} / {@code *.txt} / {@code *.xml} here. Each file is one message.
+ * Optional routing hint in the file name for MX without AppHdr: {@code name__FROMID__TOID.xml}.
+ * Processed files move to {@code data/inbox/processed} (ACK) or {@code data/inbox/error} (NAK) with a {@code .result.txt} beside them.
+ * Replies follow the transport mode. They are not written to kenex incoming unless mode is FILE (every copy to the
+ * payment application) or the message explicitly asks for FILE. The kenex watcher uses channel FOLDER.
  */
 @Slf4j
 @Component

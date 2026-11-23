@@ -47,4 +47,7 @@ public class PendingResponse {
     private String error;
     /** true if it was re-queued after a restart while FIRING (sent again as possible duplicate) */
     private boolean recovered;
+    /** HTTP or FILE when the kickoff / caller named a transport. Null = follow the inbound message, or originate. */
+    @Column(length = 8)
+    private String outboundTransport;
 }

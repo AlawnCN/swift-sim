@@ -5,6 +5,7 @@ import com.example.swiftsim.config.ConfigService;
 import com.example.swiftsim.config.Participant;
 import com.example.swiftsim.domain.MessageRecord;
 import com.example.swiftsim.domain.MessageRepository;
+import com.example.swiftsim.files.FileTransportService;
 import com.example.swiftsim.ledger.LedgerService;
 import com.example.swiftsim.parse.MtHandler;
 import com.example.swiftsim.parse.MxHandler;
@@ -51,6 +52,7 @@ public class GatewayService {
     private final ApplicationEventPublisher events;
     private final SessionService sessions;
     private final LedgerService ledger;
+    private final FileTransportService files;
     private final PlatformTransactionManager txm;
     /** Held across the ledger commit and the DELIVERED update so a restart cannot replay a half-applied message. */
     private final Object deliveryLock = new Object();
@@ -149,6 +151,8 @@ public class GatewayService {
         rec.setScenarioOverride(o.getScenario());
         rec.setDepth(o.getDepth());
         rec.setBusinessReject(o.isBusinessReject() ? Boolean.TRUE : null);
+        rec.setFileClaimId(o.getFileClaimId());
+        rec.setOutboundTransport(files.resolveOutbound(o.getOutboundTransport(), o.getChannel(), o.getInReplyTo()));
         rec.setRaw(raw);
         rec.setMur(trunc(pm.getVars().get("_mur"), 64));
         rec.setContentHash(contentHash(raw, pm));
@@ -210,11 +214,13 @@ public class GatewayService {
         ack.setStatus(ok ? "ACK" : "NAK");
         ack.setStatusReason(rec.getStatusReason());
         ack.setMir(rec.getMir());
+        ack.setOutboundTransport(rec.getOutboundTransport());
         ack.setRaw(ackText(pm, rec, ok));
         ack.setDeliveredRaw(ack.getRaw());
         repo.save(ack);
         if (sp.isPresent() && sp.get().isSut()) {
             writeOutbox(ack, sp.get().bic11());
+            files.publishToPaymentApp(ack, ack.getRaw());
             webhook(sp.get(), ack);
         }
 
@@ -303,6 +309,7 @@ public class GatewayService {
         LedgerService.Outcome out = commit.out();
         LocalDateTime now = commit.deliveredAt();
         rec.setOutboxFile(writeOutbox(rec, recv.bic11()));
+        if (recv.isSut()) files.publishToPaymentApp(rec, rec.getDeliveredRaw() != null ? rec.getDeliveredRaw() : rec.getRaw());
         rec.setWebhookStatus(webhook(recv, rec));
         repo.save(rec);
         Optional<Participant> sender = cfg.byBic(rec.getSenderBic());
@@ -322,11 +329,13 @@ public class GatewayService {
             dlv.setStatus("SENT");
             dlv.setMir(rec.getMir());
             dlv.setMor(rec.getMor());
+            dlv.setOutboundTransport(rec.getOutboundTransport());
             dlv.setRaw(dlvText(rec, now));
             dlv.setDeliveredRaw(dlv.getRaw());
             repo.save(dlv);
             if (sender.get().isSut()) {
                 writeOutbox(dlv, sender.get().bic11());
+                files.publishToPaymentApp(dlv, dlv.getRaw());
                 webhook(sender.get(), dlv);
             }
         }

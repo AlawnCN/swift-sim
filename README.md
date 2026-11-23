@@ -12,7 +12,7 @@
 
 ```
    你的系统 (SUT, BIC TSTAKEN0XXX)
-     │  REST POST /api/messages  或  文件投递 data/inbox/*.fin|*.xml
+     │  REST POST /api/messages  或  模拟器自有 data/inbox  或  支付应用目录 outgoing/mt|mx（FILE/BOTH）
      ▼
  ┌────────────────────────── swift-sim (Spring Boot 3.5, Java 21, 127.0.0.1:8080) ───────────────────────────┐
  │ 1. 格式自动识别 MT({1: 开头) / MX(< 开头)                                                                     │
@@ -24,7 +24,8 @@
  │ 6. 场景引擎：收报方为虚拟行 → 审核模式? 入审核队列 : 匹配场景 → 持久化的延迟回复 (pending_response) → 回报        │
  │ 7. 报文、台账、会话、延迟回复、审核队列都写入 H2 文件库 data/db/swiftsim.mv.db（重启可恢复）；Web UI 在 /         │
  └────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-     ▲  GET /api/messages?to=TSTAKEN0XXX   |  data/outbox/<BIC>/*.fin|xml|txt   |  可选 webhook POST(JSON)
+     ▲  GET /api/messages?to=TSTAKEN0XXX   |  data/outbox/<BIC>/（模拟器自己的归档）
+     ▲  支付应用 incoming/mt|mx（仅当该报文的投递通道是 FILE）   |  可选 webhook POST(JSON)
 ```
 
 代码结构（`src/main/java/com/example/swiftsim`）：
@@ -37,9 +38,9 @@
 | `scenario` | `ScenarioEngine`：场景匹配、模板渲染、延迟/重复/超时、kickoff（虚拟行先发报） |
 | `ledger` | `LedgerService`：交易台账、状态机、业务校验 (BIZ-xxx)、到期扫描、`Facts`（从 MT/MX 抽取业务要素）、`BusinessClock` |
 | `review` | 审核模式与审核队列（`ReviewService`、`ReviewModeService`） |
-| `web` | REST API (`/api/**`，`ApiController` + `LedgerController`)，静态页面 `src/main/resources/static/index.html`（报文 / 交易台账 / 审核队列三个页签） |
-| `files` | `DropFolderWatcher`：每 2 秒扫描 `data/inbox` |
-| `ops` | 管理端 (8081) 与 AI API (8082)：多端口 `PortsConfig`、按端口路由/鉴权 `PortGuardFilter`、`SecretsService`（账号/API key 文件）、`AuditService`、`OpsService`（报文检索/分析、dry-run 校验、业务核对）、`PurgeService`、`AdminController`、`AiController`、`McpController`；前端 `static/admin/` |
+| `web` | REST API (`/api/**`，`ApiController` + `LedgerController`)，静态页面 `src/main/resources/static/index.html`（报文 / 交易台账 / 审核队列三个页签）。跑在**网关端口 8080**，不是单独的文件客户端 |
+| `files` | `DropFolderWatcher`：模拟器自有 `data/inbox`（与支付应用目录无关）。`FileTransportService` / `KenexFolderPoller`：支付应用文件夹传输（HTTP / FILE / BOTH），与网关共用校验 / 台账 / 场景 |
+| `ops` | **管理端 UI（8081）** 与 AI API（8082），和网关是同一个进程、不同端口。管理端配置并查看文件传输，不另起 SFTP。`PortsConfig`、`PortGuardFilter`、`SecretsService`、`AuditService`、`OpsService`、`PurgeService`、`AdminController`、`AiController`、`McpController`；前端 `static/admin/` |
 
 依赖：Spring Boot 3.5.16（web / data-jpa / validation）、H2、Lombok、jackson-dataformat-yaml、
 `com.prowidesoftware:pw-swift-core:SRU2025-10.3.20`、`com.prowidesoftware:pw-iso20022:SRU2025-10.4.0`。
@@ -62,6 +63,48 @@ python3 tests/e2e.py            # 端到端测试（服务需已启动）
 * Web UI：<http://localhost:8080/>（报文日志、按交易参考号过滤、查看原文/NAK 原因、激活/触发场景、以任意参与行身份发报、加载样例）。
 * 配置目录 `./config`、数据目录 `./data`、样例目录 `./samples`（均可通过 `--sim.config-dir=` 等覆盖）。
 * 修改 YAML 后无需重启：`curl -X POST localhost:8080/api/admin/reload`。
+* 支付应用如果用文件夹而不是 HTTP 交换 MT/MX，见下文 **2B** 与 `docs/file-transport-zh.md`。默认 `HTTP` 不会打开那些目录。
+
+## 2B. 文件目录传输（支付应用 kenex）
+
+网关（8080）、管理端（8081）和 AI API（8082）是**同一个 JVM**。文件传输跑在网关进程里，走原来的校验、台账和场景；管理端只用来查看和修改模式、路径、状态。不实现 SFTP，也不需要支付应用侧再装客户端。目录在本机或共享挂载上即可。
+
+**所有配置名和界面文字都按支付应用的视角。** 根目录可配，示例 `/path/to/kenex`，不要写成某台机器的家目录。
+
+```
+/path/to/kenex/                 # sim.transport.file.root
+├── outgoing/mt/                # 支付应用发出的 MT（.txt）→ 模拟器输入。应用不清理
+├── outgoing/mx/                # 支付应用发出的 MX（.xml）→ 模拟器输入。应用不清理
+├── incoming/mt/                # 模拟器交给支付应用的 MT → 模拟器输出。模拟器不清理
+├── incoming/mx/                # 模拟器交给支付应用的 MX → 模拟器输出。模拟器不清理
+├── temp/
+│   ├── outgoing/mt/            # 模拟器收报清理：成功处理后的 MT 原文件移动到这里（不删除）
+│   ├── outgoing/mx/            # 同上，MX。这是唯一的成功归档，不再另建一套
+│   └── incoming/               # 仅支付应用：它把已读的 incoming 挪到这里。模拟器不创建、不监听、不读、不删
+└── .swiftsim/                  # 模拟器自有，只放未完成和失败，不放成功归档
+    ├── inflight/{mt,mx}
+    └── error/{mt,mx}           # 校验失败、无法解码、回声抑制。旁边有 .reason.txt
+```
+
+现有文件名示例：`MT700PYHNHFCY3PUDF7S.txt`、`MXPYHNHE327RFJ24G.xml`。模拟器写出的文件也是 `MT` + 类型 + 16 位随机字符 + `.txt`，或 `MX` + 16 位随机字符 + `.xml`，不覆盖已有文件。
+
+| 模式 | 行为 |
+|---|---|
+| `HTTP`（默认） | 原有 REST、`data/inbox`、`data/outbox` 不变。不创建、不扫描 kenex |
+| `FILE` | 从 `outgoing` 收报；交给支付应用的 ACK、投递通知、场景回复和主动发报写入 `incoming`。HTTP API 仍可调用 |
+| `BOTH` | 两种入口都收。回复跟着**进来的那条通道**：文件夹进来的写 `incoming`，HTTP 进来的不另写一份文件。主动发报（场景 kickoff）默认 HTTP，可用 `originate=FILE` 或请求参数 `transport=FILE` 改到文件夹 |
+
+`data/inbox` 仍是模拟器自己的投递目录（channel `FILE`），不是 kenex。`data/outbox/<BIC>` 仍是模拟器自己的归档，支付应用应读 `incoming`，不要两处都当收件箱。
+
+```bash
+./run.sh --sim.transport.mode=BOTH --sim.transport.file.root=/path/to/kenex
+# 支付应用只用文件夹时：
+./run.sh --sim.transport.mode=FILE --sim.transport.file.root=/path/to/kenex
+```
+
+管理端 <http://127.0.0.1:8081/#transport> 可改模式和根目录（保存在 `data/file-transport.properties`，重启后覆盖同名启动参数）。键：`sim.transport.mode`、`sim.transport.originate`、`sim.transport.file.root`、`sim.transport.file.state-dir`、`sim.transport.file.poll-ms`、`sim.transport.file.stable-ms`、`sim.transport.file.max-bytes`。对应环境变量为 Spring Boot 形式，例如 `SIM_TRANSPORT_MODE`、`SIM_TRANSPORT_FILE_ROOT`。
+
+支付应用写 `outgoing` 时应先写临时文件再改名；模拟器还会等文件大小和 mtime 稳定 `stable-ms`（默认 1000）才领取。领取成功后，原文件**移动**到 `temp/outgoing/mt` 或 `temp/outgoing/mx`（避免 MT/MX 同名冲突），不删除，也不再默认放到别的成功归档根目录。`incoming` 由支付应用自己读，读完后应用自己挪到 `temp/incoming`；模拟器写完 `incoming` 后不清理，也绝不访问 `temp/incoming`。校验失败、无法解码和回声抑制进 `.swiftsim/error`，领取中的文件在 `.swiftsim/inflight`，这两处不和成功归档混在一起。不支持的报文（例如 MT300/320/330）不会被悄悄丢掉，也不会因此增加交易引擎：沿用现有 `SIM-T01` NAK，原文件进 `.swiftsim/error` 并带 `.reason.txt`。这不是精确一次：领取后的文件不会在下一轮扫描或重启时再提交；incoming 上的文件如果在落账前被支付应用挪走，重启可能再写一次。详见 `docs/file-transport-zh.md`。
 
 ## 2A. 管理端（端口 8081）与 AI 接入 API（端口 8082）
 
@@ -398,10 +441,11 @@ curl -s -X POST "http://localhost:8080/api/messages?from=SUT_BANK&to=ADVISING_BA
 # 6) 增量轮询发给你的系统的新报文
 curl -s "http://localhost:8080/api/messages?to=SUT_BANK&sinceId=120&includeRaw=true"
 
-# 7) 文件投递：放入 inbox，结果移到 inbox/processed 或 inbox/error（旁边生成 .result.txt）
+# 7) 模拟器自有文件投递（不是支付应用 kenex）：放入 data/inbox，结果移到 inbox/processed 或 inbox/error
 cp mt785-non-extension.fin ../data/inbox/
 #    MX 无 AppHdr 时可在文件名里带路由：xxx__SUT_BANK__ADVISING_BANK.xml
-ls ../data/outbox/TSTAKEN0XXX/        # 发给你的系统的报文/ACK/NAK/投递通知
+ls ../data/outbox/TSTAKEN0XXX/        # 模拟器自己的归档，不是支付应用的 incoming
+# 支付应用目录见 docs/file-transport-zh.md：应用写 outgoing，读 incoming
 ```
 
 NAK 示例（`invalid-mt760-missing-fields.fin`）返回：

@@ -18,7 +18,7 @@ public class MessageRecord {
     private Instant updatedAt;
     /** IN = from your system (SUT) to the simulator; OUT = virtual bank -> SUT; INTERNAL = virtual -> virtual; SYS = ACK/NAK/delivery notifications/notes */
     private String direction;
-    private String channel;      // REST, FILE, UI, SCENARIO, GATEWAY
+    private String channel;      // REST, FILE (simulator data/inbox), FOLDER (payment-application kenex), UI, ADMIN, SCENARIO, GATEWAY
     private String format;       // MT, MX, SYS
     private String msgType;      // MT760, tsrv.001.001.01, ACK, NAK, DLV, NOTE
     private String senderBic;
@@ -80,6 +80,15 @@ public class MessageRecord {
     private String businessStatus;
     @Column(length = 4000)
     private String businessReason;
+    /**
+     * Where copies addressed to the payment application are published: HTTP (API / data/outbox only)
+     * or FILE (also kenex incoming). Null on rows written before folder transport existed (treated as HTTP).
+     */
+    @Column(length = 8)
+    private String outboundTransport;
+    /** Set when the message was submitted from a claimed kenex outgoing file. */
+    @Column(unique = true)
+    private Long fileClaimId;
     /** persisted so that a restart can re-deliver ACKed-but-undelivered messages with the same options */
     private String scenarioOverride;
     private Integer depth;

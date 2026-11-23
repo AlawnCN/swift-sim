@@ -1,0 +1,84 @@
+SWIFT 报文模拟器 — 发行包使用说明
+================================
+
+这个压缩包解压后即可运行，不需要 Maven、Git、源码，也不需要再下载依赖。
+带 runtime 目录的包已经包含 Java 21，部署机不必再安装 Java。
+文件名里带 slim 的包不含 Java，必须本机已有 Java 21，它不是独立运行的完整包。
+
+系统和架构写在 PACKAGE.txt。本发行脚本默认打出的完整包是 Linux x86_64。
+不要把在 x86_64 上打出来的 runtime 拷到 aarch64 或 macOS 上使用。
+其他系统请在对应机器上用 tools/package-release.sh --runtime-dir <已解压的 Java 21 JRE> 重新打包，
+或使用 --slim，然后在目标机器上安装 Java 21。
+
+1. 解压并启动
+--------------
+
+    tar -xzf swift-sim-*-linux-x86_64.tar.gz
+    cd swift-sim
+    ./run.sh
+
+停止：
+
+    ./stop.sh
+
+再执行一次 ./stop.sh 没有副作用。再执行一次 ./run.sh 不会启动第二个进程。
+可以从别的目录启动，路径里可以有空格：
+
+    "/opt/my apps/swift-sim/run.sh"
+
+日志：软件目录下 data/app.log
+进程号：data/app.pid
+数据库、文件传输的管理端设置（data/file-transport.properties）都在 data/。
+停止再启动会保留它们。不要把 data/ 或 config/secrets/ 打进新的压缩包。
+
+2. 局域网地址（默认监听 0.0.0.0）
+----------------------------------
+
+发行包默认把三个端口都绑在 0.0.0.0，局域网内可以用服务器 IP 访问：
+
+    网关 / 业务 API / 页面    http://<服务器IP>:8080/
+    管理端                    http://<服务器IP>:8081/
+    AI API                    http://<服务器IP>:8082/ai/v1
+
+源码目录里的 ./run.sh 仍然使用 application.yml 的 127.0.0.1，不会因为这次打包改成对局域网开放。
+
+安全（请认真看）：
+
+    8080 没有任何登录鉴权，并且带有删除报文、删除台账的接口。
+    只在可信局域网使用，并用防火墙限制来源网段。
+    不要把 8080 暴露到公网，本包也不会替你建立公网隧道。
+    8081 需要登录。首次启动后账号在 config/secrets/admin-console.properties（权限 600）。
+    8082 需要 Authorization: Bearer <key>。密钥在 config/secrets/ai-api-keys。
+    管理端登录和 API 密钥的校验没有被关掉，也不要关掉。
+
+只想本机访问时：
+
+    ./run.sh --server.address=127.0.0.1 --sim.admin.address=127.0.0.1 --sim.ai.address=127.0.0.1
+
+换端口：
+
+    ./run.sh --server.port=18080 --sim.admin.port=18081 --sim.ai.port=18082
+
+也可以用环境变量 SIM_BIND_ADDRESS、SIM_ADMIN_BIND、SIM_AI_BIND、SIM_PORT、SIM_ADMIN_PORT、SIM_AI_PORT。
+命令行参数写在后面，会覆盖这些默认值。指定别的 Java：SIM_JAVA=/path/to/java 。
+
+3. 支付应用文件夹（可选）
+--------------------------
+
+默认是 HTTP，不会去扫任何业务目录。支付应用用文件夹交换报文时，路径按支付应用自己的视角：
+
+    /path/to/kenex/outgoing/mt|mx     支付应用发出，模拟器读取
+    /path/to/kenex/incoming/mt|mx     模拟器写入，支付应用读取（模拟器不清理）
+    /path/to/kenex/temp/outgoing/mt|mx  模拟器成功处理后，把原文件移动到这里（不删除）
+    /path/to/kenex/temp/incoming      只属于支付应用，模拟器不访问
+
+    ./run.sh --sim.transport.mode=BOTH --sim.transport.file.root=/path/to/kenex
+
+BOTH 时，从文件夹进来的回复写到 incoming；从 HTTP 进来的回复不会再写一份文件。
+更细的说明见同目录 docs/file-transport-zh.md。管理端「文件传输」页可以查看和修改。
+
+4. 启动失败时
+--------------
+
+端口已被占用、Java 无法执行、或进程起不来时，./run.sh 会退出并提示日志位置，不会留下一个假的“正在运行”。
+./stop.sh 只停止本目录启动的模拟器。pid 文件过期会清掉。pid 如果指向别的 Java 进程，不会杀掉它。

@@ -7,7 +7,7 @@ import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Extra Tomcat connectors: admin console and AI API, each bound to 127.0.0.1 only. Routing per port: {@link PortGuardFilter}. */
+/** Extra Tomcat connectors for the admin console and the AI API. Address comes from configuration (source default 127.0.0.1; the release package passes 0.0.0.0). Routing per port: {@link PortGuardFilter}. */
 @Configuration
 @RequiredArgsConstructor
 public class PortsConfig {

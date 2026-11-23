@@ -153,23 +153,45 @@ python3 tests/e2e.py            # 端到端测试（服务需已启动）
 
 ### 部署 / 监听地址
 
-三个端口（8080 网关、8081 管理端、8082 AI API）**默认都只绑定 `127.0.0.1`**，只能本机访问。
+**源码目录**里直接 `./run.sh` 时，三个端口（8080 网关、8081 管理端、8082 AI API）仍按 `application.yml` **只绑定 `127.0.0.1`**。
 
-如需在局域网内访问（监听所有网卡），任选其一：
+**发行包**（`tools/package-release.sh` 打出的 tar.gz）解压后执行 `./run.sh`，三个端口**默认绑定 `0.0.0.0`**，供可信局域网访问。包内有中文 `使用说明.txt`。完整包自带 Linux x86_64 的 Java 21，目标机器不需要 Maven 或再下载依赖。`*-slim.tar.gz` 不含 Java，必须本机已有 Java 21，不要把它当成免安装包。
 
 ```bash
-# 方式一：启动参数覆盖（run.sh 会把参数原样传给 jar）
+# 在有 Maven 的机器上打包（自动下载的运行时只限 linux x86_64）
+tools/package-release.sh
+# 其他架构：自行准备该系统的 Java 21 JRE 再打
+# tools/package-release.sh --runtime-dir /path/to/jre --os linux --arch aarch64
+# 不含 Java 的精简包：
+# tools/package-release.sh --slim
+
+tar -xzf dist/swift-sim-*-linux-x86_64.tar.gz
+cd swift-sim
+./run.sh
+./stop.sh
+```
+
+局域网地址（`<host>` 为服务器 IP）：网关 `http://<host>:8080`、管理端 `http://<host>:8081`、AI API `http://<host>:8082/ai/v1`。
+
+只监听本机，或源码目录临时对局域网开放：
+
+```bash
+# 发行包改回本机
+./run.sh --server.address=127.0.0.1 --sim.admin.address=127.0.0.1 --sim.ai.address=127.0.0.1
+# 源码目录对局域网开放（参数写在后面，覆盖默认值）
 ./run.sh --server.address=0.0.0.0 --sim.admin.address=0.0.0.0 --sim.ai.address=0.0.0.0
 ```
 
-* 方式二：修改 `src/main/resources/application.yml` 中的三处 `address:`（`server.address`、`sim.admin.address`、`sim.ai.address`），然后重新打包。
+文件传输仍是原来的语义（支付应用视角）：`outgoing` 是模拟器输入，成功后原文件移动到 `temp/outgoing`；`incoming` 是模拟器输出且不清理；`temp/incoming` 只属于支付应用。发行包示例：
 
-访问地址（`<host>` 为部署机器的 IP 或主机名）：网关 `http://<host>:8080`、管理端 `http://<host>:8081`、AI API `http://<host>:8082/ai/v1`。
+```bash
+./run.sh --sim.transport.mode=BOTH --sim.transport.file.root=/path/to/kenex
+```
 
 **安全提示**：
-* **8080 网关本身没有任何鉴权**（并且提供 `DELETE /api/messages`、`DELETE /api/undertakings` 等删除接口），**不要暴露到公网**，仅在可信内网中开放。
-* 8081 管理端需要登录，账号密码在 `config/secrets/admin-console.properties`（首次启动自动生成）。
-* 8082 AI API 需要 `Authorization: Bearer <key>`，key 在 `config/secrets/ai-api-keys`。
+* **8080 网关本身没有任何鉴权**（并且提供 `DELETE /api/messages`、`DELETE /api/undertakings` 等删除接口）。发行包默认对局域网开放，**只用在可信内网**，并用防火墙限制来源。**不要暴露到公网**，软件也不会默认建立隧道。
+* 8081 管理端需要登录，账号密码在 `config/secrets/admin-console.properties`（首次启动自动生成）。发行包不带任何已有口令。
+* 8082 AI API 需要 `Authorization: Bearer <key>`，key 在 `config/secrets/ai-api-keys`。登录和密钥校验保持原样。
 
 ## 3. 虚拟参与行（`config/participants.yml`，全部虚构）
 

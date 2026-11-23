@@ -19,6 +19,13 @@
     <prowide.mx.version>SRU2025-10.4.0</prowide.mx.version>
     <!-- Spring Boot 3.5 manages commons-lang3 3.17.x, but Prowide SRU2025 needs >= 3.20 (org.apache.commons.lang3.Strings) -->
     <commons-lang3.version>3.20.0</commons-lang3.version>
+    <!-- package phase writes target/swift-sim-*.tar.gz unless this is true -->
+    <swift.skip.dist>false</swift.skip.dist>
+    <!-- optional extracted Java 21 JRE; empty downloads Temurin 21 for linux x86_64 on the build machine -->
+    <swift.runtime.dir></swift.runtime.dir>
+    <swift.dist.slim>false</swift.dist.slim>
+    <swift.dist.os></swift.dist.os>
+    <swift.dist.arch></swift.dist.arch>
   </properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
@@ -44,6 +51,33 @@
       <plugin>
         <groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId>
         <configuration><excludes><exclude><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId></exclude></excludes></configuration>
+      </plugin>
+      <!-- After the jar exists: assemble target/swift-sim-*.tar.gz. Does not run Maven again. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>dist-tar</id>
+            <phase>package</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <skip>${swift.skip.dist}</skip>
+              <executable>bash</executable>
+              <workingDirectory>${project.basedir}</workingDirectory>
+              <arguments>
+                <argument>${project.basedir}/tools/package-release.sh</argument>
+              </arguments>
+              <environmentVariables>
+                <SWIFT_RUNTIME_DIR>${swift.runtime.dir}</SWIFT_RUNTIME_DIR>
+                <SWIFT_DIST_SLIM>${swift.dist.slim}</SWIFT_DIST_SLIM>
+                <SWIFT_DIST_OS>${swift.dist.os}</SWIFT_DIST_OS>
+                <SWIFT_DIST_ARCH>${swift.dist.arch}</SWIFT_DIST_ARCH>
+              </environmentVariables>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

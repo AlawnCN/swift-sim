@@ -64,6 +64,10 @@ public class PortGuardFilter extends OncePerRequestFilter {
             return;
         }
         user.ifPresent(u -> req.setAttribute(ADMIN_USER_ATTR, u));
+        // The console is one HTML page plus app.js. Without this, browsers heuristically cache the
+        // previous script after a restart and the compose screen keeps the old sample-load behaviour.
+        if (path.equals("/admin/") || path.equals("/admin/index.html") || path.equals("/admin/app.js") || path.equals("/admin/login.html"))
+            res.setHeader("Cache-Control", "no-cache");
         if (path.equals("/admin/")) { req.getRequestDispatcher("/admin/index.html").forward(req, res); return; }
         try {
             chain.doFilter(req, res);

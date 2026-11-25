@@ -1,4 +1,6 @@
 'use strict';
+// admin-ui:ui-3
+const ADMIN_UI = 'ui-3';
 const $ = s => document.querySelector(s);
 const M = () => $('#main');
 const esc = v => v == null ? '' : String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,7 +95,7 @@ async function transport() {
    <div class="row">模拟器状态目录（空 = &lt;根&gt;/.swiftsim） <input id="tr_state" size="40" value="${esc(t.stateDir || '')}"></div>
    <div class="row">轮询 ms <input id="tr_poll" size="6" value="${esc(t.pollMs)}"> 稳定等待 ms <input id="tr_stable" size="6" value="${esc(t.stableMs)}"></div>
    <div class="row"><button onclick="saveTransport()">保存</button> <button class="sec" onclick="transport()">刷新</button></div>
-   <div class="small muted">HTTP：不创建、不扫描支付应用目录。FILE / BOTH：读取 outgoing，成功后把原文件移动到 temp/outgoing（不删除、不另建成功归档根）。要交给支付应用的报文写到 incoming，模拟器不清理 incoming。BOTH 下 HTTP 提交的回复不会再写一份到 incoming。temp/incoming 始终不访问。失败和领取中的文件在 .swiftsim，不进 temp/outgoing。</div></div>
+   <div class="small muted">HTTP：不创建、不扫描支付应用目录。FILE / BOTH：读取 outgoing，成功后把原文件移动到 temp/outgoing（不删除、不另建成功归档根）。要交给支付应用的报文写到 incoming，模拟器不清理 incoming。BOTH 下 HTTP 提交的回复不会再写一份到 incoming。temp/incoming 始终不访问。失败和领取中的文件在 .swiftsim，不进 temp/outgoing。保存写入 data/file-transport.properties，当前进程立即生效，下次启动覆盖启动参数中的同名项。</div></div>
   <div class="split"><div class="card"><h3>隔离 / 回声</h3><table><tr><th>时间</th><th>文件</th><th>状态</th><th>报文</th><th>原因</th></tr>${errs || '<tr><td colspan="5" class="muted">无</td></tr>'}</table></div>
   <div class="card"><h3>写出的 incoming 文件</h3><table><tr><th>报文</th><th>状态</th><th>类型</th><th>文件名</th><th>路径 / 原因</th></tr>${pubs || '<tr><td colspan="5" class="muted">无</td></tr>'}</table></div></div>`;
 }
@@ -235,7 +237,7 @@ async function scen() {
    交给支付应用 <select id="sc_tr"><option value="">自动</option><option>HTTP</option><option>FILE</option></select>
    编号(可选) <input id="sc_ref" size="18"> 发报方 <select id="sc_from">${partOpts('')}</select> 收报方 <select id="sc_to">${partOpts('')}</select>
    <input id="sc_q" placeholder="搜索场景" oninput="scFilter()"></div>
-   <div class="small muted">自动：BOTH/HTTP 下主动发报走 originate（默认 HTTP，不写 incoming）；FILE 模式下走文件夹。选 FILE 则本次 kickoff 写到 incoming。</div></div>
+   <div class="small muted">自动：BOTH/HTTP 下主动发报走 originate（默认 HTTP，不写 incoming）；FILE 模式下走文件夹。选 FILE 则本次 kickoff 在投递给被测系统后写入 incoming。发给虚拟行的 kickoff 不写 incoming。</div></div>
   ${Object.entries(groups).map(([g, ss]) => `<div class="card group"><h3>${esc(g)}</h3>${ss.map(s => `<div class="scen ${s.active ? 'active' : ''}" data-q="${esc((s.id + ' ' + s.name + ' ' + (s.description || '')).toLowerCase())}">
    <b>${esc(s.id)}</b> ${esc(s.name)} ${s.active ? '<span class="badge on">激活</span>' : ''}${s.fallback ? '<span class="badge">兜底</span>' : ''} <span class="small muted">响应 ${esc((s.reactsTo || []).join(', '))}</span>
    <span style="float:right">${s.active ? '' : `<button class="sec" onclick="scAct('${esc(s.id)}')">激活</button>`} ${s.hasKickoff ? `<button onclick="scTrig('${esc(s.id)}')">发起</button>` : ''}</span>
@@ -252,9 +254,10 @@ async function scTrig(id) {
 async function compose() {
   const c = window._compose || {}; window._compose = null;
   const samples = await api('/api/samples').catch(() => []);
-  M().innerHTML = `<h2>发报 / 校验 <span class="muted small">以任一机构(被测系统或虚拟行)身份发报，经过正常网关校验、序号、ACK/NAK、投递、台账与场景</span></h2>
+  M().innerHTML = `<h2>发报 / 校验 <span class="muted small">界面 ${ADMIN_UI} · 以任一机构(被测系统或虚拟行)身份发报，经过正常网关校验、序号、ACK/NAK、投递、台账与场景</span></h2>
   <div class="split"><div class="card"><div class="row">发报方 <select id="c_from">${partOpts(c.from)}</select> 收报方 <select id="c_to">${partOpts(c.to)}</select> MT类型(仅裸 block 4) <input id="c_mt" size="5" placeholder="760" autocomplete="off">
-   回复通道 <select id="c_tr"><option value="">自动</option><option>HTTP</option><option>FILE</option></select></div>
+   交给支付应用 <select id="c_tr"><option value="">自动</option><option>HTTP</option><option>FILE</option></select></div>
+   <div class="small muted">自动只在文件传输模式为 FILE 时写入 incoming。BOTH 和 HTTP 下自动就是 HTTP，不写文件（主动发报页的自动才使用 originate，两边规则不同）。选 FILE 后，只有投递给被测系统的报文在投递成功后写入根目录 incoming/mt 或 incoming/mx。发给虚拟行的报文本身不写 incoming，随后回给被测系统的回复沿用本次选择。只校验和 NAK 不写用户报文。outgoing 是支付应用的发送目录，data/outbox 是模拟器自己的副本。</div>
    <div class="row">样例 <select id="c_s"><option value="">(选择样例)</option>${samples.map(s => `<option>${esc(s)}</option>`).join('')}</select> <button class="sec" onclick="loadSample()">载入</button>
     强制场景 <input id="c_sc" size="16" placeholder="可选"></div>
    <textarea id="c_raw" rows="22" placeholder="完整 MT (FIN) / MX (XML+AppHdr) 报文，或以 : 开头的 MT block 4">${esc(c.raw || '')}</textarea>
@@ -303,11 +306,25 @@ async function cValidate() {
   $('#c_out').innerHTML = `<div class="row"><b>${esc(r.verdict)}</b> ${esc(r.verdict_zh)}</div>${kv(r, ['format', 'msgType', 'sender', 'receiver', 'direction', 'txRef', 'relatedRef'])}
    ${r.business ? `<div class="small">业务检查: ${esc(JSON.stringify(r.business))}</div>` : ''}<h3>发现</h3>${findingsTable(r.findings)}<div class="small muted">${esc(r.note)}</div>`;
 }
+function fileNote(f) {
+  if (!f || !f.reason) return '';
+  const path = f.incomingMt ? '（' + f.incomingMt + '）' : '';
+  const text = {
+    NAK: 'NAK：用户报文未投递，不写入 incoming。' + (f.publishNakNotice ? '发报方是被测系统且通道为 FILE 时，NAK 通知仍会写给被测系统。' : ''),
+    MODE_HTTP_IGNORES_FILE: '当前是 HTTP 模式，选择 FILE 不会写 incoming。请先在文件传输改为 FILE 或 BOTH 并保存。保存立即生效，并写入 data/file-transport.properties，下次启动覆盖启动参数。',
+    HTTP: '通道 HTTP：不写入 incoming。BOTH 下本页“自动”就是 HTTP；要写文件请选 FILE。',
+    RECEIVER_NOT_SUT: '通道 FILE，但收报方不是被测系统：本报文不写入 incoming。随后回给被测系统的回复会沿用 FILE。',
+    TO_SUT: '通道 FILE：投递成功后写入 incoming' + path + '。不是 outgoing，也不是 data/outbox。写出失败记在文件传输页，不会只显示 ACK。',
+    LAYOUT: '支付应用目录不可用，本报文不会写入 incoming。' + (f.error ? ' ' + f.error : '')
+  }[f.reason] || f.reason;
+  const bad = f.reason === 'LAYOUT' || f.reason === 'MODE_HTTP_IGNORES_FILE' || f.error;
+  return `<div class="small ${bad ? 'sev-ERROR' : ''}">${esc(text)}</div>`;
+}
 async function cSend() {
   await applyComposeEnvelope();
   if (!confirm('确认发送？(将消耗序号并进入正常业务流程)')) return;
   const r = await api('/admin/api/send', {method: 'POST', body: cBody(), allowError: true});
-  $('#c_out').innerHTML = `<div class="row"><b class="st-${esc(r.status)}">${esc(r.status)}</b> ${r.id ? `<a href="#msgs/${r.id}">报文 #${r.id}</a>` : ''}</div>${kv(r)}${(r.errors || []).length ? '<h3>错误</h3><pre>' + esc(r.errors.join('\n')) + '</pre>' : ''}${(r.warnings || []).length ? '<h3>警告</h3><pre>' + esc(r.warnings.join('\n')) + '</pre>' : ''}<pre>${esc(r.ack)}</pre>`;
+  $('#c_out').innerHTML = `<div class="row"><b class="st-${esc(r.status)}">${esc(r.status)}</b> ${r.id ? `<a href="#msgs/${r.id}">报文 #${r.id}</a>` : ''}</div>${fileNote(r.file)}${kv(r)}${(r.errors || []).length ? '<h3>错误</h3><pre>' + esc(r.errors.join('\n')) + '</pre>' : ''}${(r.warnings || []).length ? '<h3>警告</h3><pre>' + esc(r.warnings.join('\n')) + '</pre>' : ''}<pre>${esc(r.ack)}</pre>`;
 }
 
 // ---------------------------------------------------------------------------------------------- logs

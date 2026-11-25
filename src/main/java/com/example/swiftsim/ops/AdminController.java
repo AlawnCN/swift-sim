@@ -154,11 +154,14 @@ public class AdminController {
 
     /** Send as any participant (SUT or virtual bank) through the normal gateway path (validation, ISN/OSN, ACK/NAK, delivery, ledger, scenarios). */
     @PostMapping("/send")
-    public ResponseEntity<SubmitResult> send(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> send(@RequestBody Map<String, String> body) {
         String raw = EnvelopeAddresses.apply(body.get("raw"), partyBic(body.get("from")), partyBic(body.get("to")));
         SubmitResult r = gateway.submit(raw, SubmitOptions.builder().channel("ADMIN").from(blank(body.get("from"))).to(blank(body.get("to")))
                 .mtType(blank(body.get("mtType"))).scenario(blank(body.get("scenario"))).outboundTransport(blank(body.get("transport"))).build());
-        return ResponseEntity.status("ACK".equals(r.getStatus()) ? HttpStatus.ACCEPTED : HttpStatus.UNPROCESSABLE_ENTITY).body(r);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = json.convertValue(r, Map.class);
+        out.put("file", fileTransport.adminSendPlan(blank(body.get("transport")), "NAK".equals(r.getStatus()), r.getSender(), r.getReceiver()));
+        return ResponseEntity.status("ACK".equals(r.getStatus()) ? HttpStatus.ACCEPTED : HttpStatus.UNPROCESSABLE_ENTITY).body(out);
     }
 
     /** Participant id or BIC8/BIC11/LT12 from the compose selectors. Null when the selector is empty. */

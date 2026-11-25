@@ -176,6 +176,52 @@ public class FileTransportService {
         return HTTP;
     }
 
+    /**
+     * What an admin compose send will do with the payment-application folder. Does not publish.
+     * An explicit FILE choice is ignored while mode is HTTP. A NAK'd user message is not published;
+     * a later reply copies the stored transport only when a scenario actually sends one.
+     */
+    public Map<String, Object> adminSendPlan(String explicit, boolean nak, String senderBic, String receiverBic) {
+        String resolved = resolveOutbound(explicit, "ADMIN", null);
+        Settings s = cfg.get();
+        boolean receiverIsSut = receiverBic != null && participants.byBic(receiverBic).map(p -> p.isSut()).orElse(false);
+        boolean senderIsSut = senderBic != null && participants.byBic(senderBic).map(p -> p.isSut()).orElse(false);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("transport", resolved);
+        m.put("receiverIsSut", receiverIsSut);
+        String reason;
+        String error = null;
+        if (nak) reason = "NAK";
+        else if (FILE.equals(norm(explicit)) && !s.fileEnabled()) reason = "MODE_HTTP_IGNORES_FILE";
+        else if (!FILE.equals(resolved)) reason = "HTTP";
+        else if (!receiverIsSut) reason = "RECEIVER_NOT_SUT";
+        else reason = "TO_SUT";
+        boolean publish = "TO_SUT".equals(reason);
+        if (publish) {
+            KenexLayout.Result layout = KenexLayout.resolve(s.root, s.stateDir);
+            if (layout.error != null) {
+                reason = "LAYOUT";
+                publish = false;
+                error = layout.error;
+            } else {
+                Path root = layout.layout.root;
+                if (Files.isSymbolicLink(root) || (Files.exists(root) && !Files.isDirectory(root, NOFOLLOW))) {
+                    reason = "LAYOUT";
+                    publish = false;
+                    error = "file root is not a real directory: " + root;
+                } else {
+                    m.put("incomingMt", layout.layout.incomingMt.toString());
+                    m.put("incomingMx", layout.layout.incomingMx.toString());
+                }
+            }
+        }
+        m.put("reason", reason);
+        m.put("publishSubmittedMessage", publish);
+        if ("NAK".equals(reason) && FILE.equals(resolved) && senderIsSut) m.put("publishNakNotice", true);
+        if (error != null) m.put("error", error);
+        return m;
+    }
+
     /** Publish one already-stored message into {@code incoming/mt} or {@code incoming/mx}, once. */
     public void publishToPaymentApp(MessageRecord rec, String payload) {
         if (!running.get() || rec == null || rec.getId() == null || payload == null || payload.isEmpty()) return;

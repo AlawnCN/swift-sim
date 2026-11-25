@@ -253,22 +253,58 @@ async function compose() {
   const c = window._compose || {}; window._compose = null;
   const samples = await api('/api/samples').catch(() => []);
   M().innerHTML = `<h2>发报 / 校验 <span class="muted small">以任一机构(被测系统或虚拟行)身份发报，经过正常网关校验、序号、ACK/NAK、投递、台账与场景</span></h2>
-  <div class="split"><div class="card"><div class="row">发报方 <select id="c_from">${partOpts(c.from)}</select> 收报方 <select id="c_to">${partOpts(c.to)}</select> MT类型(仅裸 block 4) <input id="c_mt" size="5" placeholder="760">
+  <div class="split"><div class="card"><div class="row">发报方 <select id="c_from">${partOpts(c.from)}</select> 收报方 <select id="c_to">${partOpts(c.to)}</select> MT类型(仅裸 block 4) <input id="c_mt" size="5" placeholder="760" autocomplete="off">
    回复通道 <select id="c_tr"><option value="">自动</option><option>HTTP</option><option>FILE</option></select></div>
    <div class="row">样例 <select id="c_s"><option value="">(选择样例)</option>${samples.map(s => `<option>${esc(s)}</option>`).join('')}</select> <button class="sec" onclick="loadSample()">载入</button>
     强制场景 <input id="c_sc" size="16" placeholder="可选"></div>
    <textarea id="c_raw" rows="22" placeholder="完整 MT (FIN) / MX (XML+AppHdr) 报文，或以 : 开头的 MT block 4">${esc(c.raw || '')}</textarea>
    <div class="row" style="margin-top:6px"><button class="sec" onclick="cValidate()">只校验 (不发送)</button><button onclick="cSend()">发送</button></div></div>
   <div class="card"><h3>结果</h3><div id="c_out" class="muted">—</div></div></div>`;
+  $('#c_from').onchange = () => applyComposeEnvelope();
+  $('#c_to').onchange = () => applyComposeEnvelope();
+  if ($('#c_raw').value.trim()) {
+    $('#c_mt').value = detectMtType($('#c_raw').value);
+    await applyComposeEnvelope();
+  }
 }
-async function loadSample() { const n = $('#c_s').value; if (!n) return; $('#c_raw').value = await api('/api/samples/' + encodeURIComponent(n)); }
+let envSeq = 0;
+/** 3-digit MT from block 2 before block 4. Same rule as EnvelopeAddresses.mtType. */
+function detectMtType(raw) {
+  const cut = raw.indexOf('{4:');
+  const head = cut < 0 ? raw : raw.slice(0, cut);
+  const m = /\{2:[IO]([0-9]{3})/.exec(head);
+  return m ? m[1] : '';
+}
+async function loadSample() {
+  const n = $('#c_s').value;
+  if (!n) return;
+  const text = await api('/api/samples/' + encodeURIComponent(n));
+  $('#c_raw').value = text;
+  $('#c_mt').value = detectMtType(text);
+  await applyComposeEnvelope();
+}
+async function applyComposeEnvelope() {
+  const area = $('#c_raw');
+  if (!area || !area.value) return;
+  const raw = area.value;
+  const from = $('#c_from').value;
+  const to = $('#c_to').value;
+  if (!from && !to) return;
+  const seq = ++envSeq;
+  const r = await api('/admin/api/envelope', {method: 'POST', body: {raw, from, to}});
+  if (seq !== envSeq || !$('#c_raw') || $('#c_raw').value !== raw) return;
+  if (r.raw !== raw) $('#c_raw').value = r.raw;
+}
 function cBody() { return {raw: $('#c_raw').value, from: $('#c_from').value, to: $('#c_to').value, mtType: $('#c_mt').value.trim(), scenario: $('#c_sc').value.trim(), transport: $('#c_tr').value}; }
 async function cValidate() {
+  await applyComposeEnvelope();
   const r = await api('/admin/api/validate', {method: 'POST', body: cBody()});
+  if (typeof r.raw === 'string' && $('#c_raw').value !== r.raw) $('#c_raw').value = r.raw;
   $('#c_out').innerHTML = `<div class="row"><b>${esc(r.verdict)}</b> ${esc(r.verdict_zh)}</div>${kv(r, ['format', 'msgType', 'sender', 'receiver', 'direction', 'txRef', 'relatedRef'])}
    ${r.business ? `<div class="small">业务检查: ${esc(JSON.stringify(r.business))}</div>` : ''}<h3>发现</h3>${findingsTable(r.findings)}<div class="small muted">${esc(r.note)}</div>`;
 }
 async function cSend() {
+  await applyComposeEnvelope();
   if (!confirm('确认发送？(将消耗序号并进入正常业务流程)')) return;
   const r = await api('/admin/api/send', {method: 'POST', body: cBody(), allowError: true});
   $('#c_out').innerHTML = `<div class="row"><b class="st-${esc(r.status)}">${esc(r.status)}</b> ${r.id ? `<a href="#msgs/${r.id}">报文 #${r.id}</a>` : ''}</div>${kv(r)}${(r.errors || []).length ? '<h3>错误</h3><pre>' + esc(r.errors.join('\n')) + '</pre>' : ''}${(r.warnings || []).length ? '<h3>警告</h3><pre>' + esc(r.warnings.join('\n')) + '</pre>' : ''}<pre>${esc(r.ack)}</pre>`;

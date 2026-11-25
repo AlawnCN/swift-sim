@@ -6,6 +6,7 @@ import com.example.swiftsim.files.FileTransportService;
 import com.example.swiftsim.gateway.GatewayService;
 import com.example.swiftsim.gateway.SubmitOptions;
 import com.example.swiftsim.gateway.SubmitResult;
+import com.example.swiftsim.parse.EnvelopeAddresses;
 import com.example.swiftsim.review.ReviewService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -131,17 +132,39 @@ public class AdminController {
 
     // ------------------------------------------------------------------------------------------------ compose / validate / review draft
 
+    /** Preview the compose text with the selected parties written into the envelope only. Does not validate or send. */
+    @PostMapping("/envelope")
+    public Map<String, Object> envelope(@RequestBody Map<String, String> body) {
+        String raw = body.get("raw");
+        String applied = EnvelopeAddresses.apply(raw, partyBic(body.get("from")), partyBic(body.get("to")));
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("raw", applied == null ? "" : applied);
+        String mt = EnvelopeAddresses.mtType(raw);
+        if (mt != null) m.put("mtType", mt);
+        return m;
+    }
+
     @PostMapping("/validate")
     public Map<String, Object> validate(@RequestBody Map<String, String> body) {
-        return ops.validate(body.get("raw"), body.get("from"), body.get("to"), body.get("mtType"));
+        String raw = EnvelopeAddresses.apply(body.get("raw"), partyBic(body.get("from")), partyBic(body.get("to")));
+        Map<String, Object> out = ops.validate(raw, body.get("from"), body.get("to"), body.get("mtType"));
+        out.put("raw", raw);
+        return out;
     }
 
     /** Send as any participant (SUT or virtual bank) through the normal gateway path (validation, ISN/OSN, ACK/NAK, delivery, ledger, scenarios). */
     @PostMapping("/send")
     public ResponseEntity<SubmitResult> send(@RequestBody Map<String, String> body) {
-        SubmitResult r = gateway.submit(body.get("raw"), SubmitOptions.builder().channel("ADMIN").from(blank(body.get("from"))).to(blank(body.get("to")))
+        String raw = EnvelopeAddresses.apply(body.get("raw"), partyBic(body.get("from")), partyBic(body.get("to")));
+        SubmitResult r = gateway.submit(raw, SubmitOptions.builder().channel("ADMIN").from(blank(body.get("from"))).to(blank(body.get("to")))
                 .mtType(blank(body.get("mtType"))).scenario(blank(body.get("scenario"))).outboundTransport(blank(body.get("transport"))).build());
         return ResponseEntity.status("ACK".equals(r.getStatus()) ? HttpStatus.ACCEPTED : HttpStatus.UNPROCESSABLE_ENTITY).body(r);
+    }
+
+    /** Participant id or BIC8/BIC11/LT12 from the compose selectors. Null when the selector is empty. */
+    private String partyBic(String idOrBic) {
+        String id = blank(idOrBic);
+        return id == null ? null : gateway.bicOf(id);
     }
 
     @PostMapping("/review-queue/{id}/preview")

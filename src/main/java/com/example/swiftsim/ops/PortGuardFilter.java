@@ -68,7 +68,7 @@ public class PortGuardFilter extends OncePerRequestFilter {
         try {
             chain.doFilter(req, res);
         } finally {
-            if (mutating && !path.equals("/admin/api/login"))
+            if (mutating && !path.equals("/admin/api/login") && !path.equals("/admin/api/envelope"))
                 audit.record("admin:" + user.orElse("?"), "admin", req.getMethod(), path, req.getQueryString(), res.getStatus());
         }
     }
